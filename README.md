@@ -1,59 +1,26 @@
-# Bu Dian Allergen Detection - ML Training
+# Bu Dian ML Training
 
-Standalone ML training pipeline for the Bu Dian Allergen Detection system. This project handles model training, hyperparameter tuning, and evaluation using Word2Vec + BiLSTM/LSTM.
+Pipeline training model untuk deteksi alergen makanan. Menggunakan Word2Vec + BiLSTM/LSTM dengan hyperparameter tuning dan evaluasi komprehensif.
 
-## Project Structure
+## Tech Stack
 
-```
-ml-training/
-├── app/
-│   ├── __init__.py
-│   ├── config.py                    # Central configuration
-│   ├── core/
-│   │   ├── __init__.py
-│   │   ├── preprocessing/
-│   │   │   ├── __init__.py
-│   │   │   ├── image.py             # Image preprocessing for OCR
-│   │   │   └── text.py              # Text preprocessing & Sastrawi stopwords
-│   │   ├── ocr/
-│   │   │   ├── __init__.py
-│   │   │   ├── engine.py            # Tesseract OCR engine
-│   │   │   ├── composition.py       # Composition text extraction
-│   │   │   └── bold.py              # Bold text detection for allergens
-│   │   ├── embedding/
-│   │   │   ├── __init__.py
-│   │   │   └── word2vec.py          # Word2Vec training & embedding matrix
-│   │   └── model/
-│   │       ├── __init__.py
-│   │       ├── architecture.py      # LSTM/BiLSTM model builder
-│   │       ├── tokenizer.py         # Keras tokenizer wrapper
-│   │       ├── tuner.py             # Hyperparameter tuning
-│   │       └── evaluator.py         # Evaluation metrics & plots
-│   ├── training/
-│   │   ├── __init__.py
-│   │   └── trainer.py               # Main training orchestrator
-│   └── evaluation/
-│       ├── __init__.py
-│       └── evaluator.py             # Model evaluation & export
-├── scripts/
-│   ├── __init__.py
-│   ├── train.py                     # CLI training script
-│   └── evaluate.py                  # CLI evaluation script
-├── tests/
-├── requirements.txt
-├── .env.example
-├── .gitignore
-└── README.md
-```
+- Python 3.11
+- TensorFlow 2.17 (deep learning)
+- Gensim 4.3 (Word2Vec embeddings)
+- Sastrawi 1.0 (Indonesian NLP - stopword removal)
+- OpenCV 4.11 (image preprocessing)
+- Tesseract OCR via Pytesseract
+- Scikit-learn (metrics, preprocessing)
+- Click (CLI framework)
 
 ## Setup
 
-### 1. Create virtual environment
+### 1. Buat virtual environment
 
 ```bash
 python -m venv venv
 source venv/bin/activate  # macOS/Linux
-# or
+# atau
 venv\Scripts\activate     # Windows
 ```
 
@@ -63,14 +30,7 @@ venv\Scripts\activate     # Windows
 pip install -r requirements.txt
 ```
 
-### 3. Configure environment
-
-```bash
-cp .env.example .env
-# Edit .env with your settings
-```
-
-### 4. Install Tesseract OCR
+### 3. Install Tesseract OCR
 
 ```bash
 # macOS
@@ -80,35 +40,69 @@ brew install tesseract
 sudo apt-get install tesseract-ocr
 
 # Windows
-# Download installer from https://github.com/UB-Mannheim/tesseract/wiki
+# Download installer dari https://github.com/UB-Mannheim/tesseract/wiki
 ```
 
-## Usage
+### 4. Konfigurasi environment
+
+```bash
+cp .env.example .env
+```
+
+```env
+DATASET_DIR=./dataset
+OUTPUT_DIR=./output
+MODEL_DIR=./models
+CSV_INPUT=./ocr_output/data-mengandung.csv
+SEED=42
+```
+
+## CLI Usage
 
 ### Training
 
 ```bash
-# Train with default configuration
+# Training dengan konfigurasi default
 python scripts/train.py train
 
-# Train with custom options
+# Training dengan opsi custom
 python scripts/train.py train --data-source CSV --csv-input ./data/composition.csv --epochs 100
 
-# Show current configuration
+# Training dengan config file
+python scripts/train.py train -c .env
+
+# Lihat konfigurasi saat ini
 python scripts/train.py info
+
+# Jalankan dengan verbose logging
+python scripts/train.py -v train
 ```
 
-### Evaluation
+### Opsi Training
+
+| Opsi | Deskripsi | Default |
+|------|-----------|---------|
+| `--config-file` | Path file .env config | - |
+| `--data-source` | Sumber data: `CSV` atau `OCR` | CSV |
+| `--csv-input` | Path file CSV input | dari .env |
+| `--output-dir` | Direktori output | `./output` |
+| `--model-dir` | Direktori model | `./models` |
+| `--epochs` | Jumlah epochs | 150 |
+| `--batch-size` | Batch size | 64 |
+| `--seed` | Random seed | 42 |
+
+### Evaluasi
 
 ```bash
-# Compare BiLSTM and LSTM models
+# Bandingkan model BiLSTM dan LSTM
 python scripts/evaluate.py compare \
     --model-bilstm ./models/bilstm_word2vec.keras \
     --model-lstm ./models/lstm_word2vec.keras \
-    --csv-input ./ocr_output/data-mengandung.csv
+    --csv-input ./ocr_output/data-mengandung.csv \
+    --output-dir ./output
 ```
 
-### As Python Module
+### Sebagai Python Module
 
 ```python
 from app.config import Config
@@ -122,61 +116,87 @@ results = run_training(config)
 print(results["comparison"])
 ```
 
-## Configuration
+## Konfigurasi
 
-All settings are in `app/config.py` (extracted from the notebook's PANEL KONFIGURASI UTAMA):
+Semua pengaturan ada di `app/config.py`:
 
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `data_source_mode` | `CSV` | Data source: `CSV` or `OCR` |
-| `test_size` | `0.2` | Train/test split ratio |
-| `max_len` | `120` | Max sequence length |
-| `vocab_size` | `20000` | Maximum vocabulary size |
-| `embed_dim` | `100` | Word2Vec embedding dimension |
-| `min_word_count` | `3` | Min word count for Word2Vec |
-| `w2v_epochs` | `30` | Word2Vec training epochs |
-| `lstm_units_1` | `128` | First LSTM layer units |
-| `lstm_units_2` | `64` | Second LSTM layer units |
-| `dropout_rate_1` | `0.3` | First dropout rate |
-| `dropout_rate_2` | `0.3` | Second dropout rate |
-| `learning_rate` | `1e-4` | Adam optimizer learning rate |
-| `batch_size` | `64` | Training batch size |
+| Parameter | Default | Deskripsi |
+|-----------|---------|-----------|
+| `data_source_mode` | `CSV` | Sumber data: `CSV` atau `OCR` |
+| `test_size` | `0.2` | Rasio train/test split |
+| `max_len` | `120` | Panjang sekuens maksimal |
+| `vocab_size` | `20000` | Ukuran vocabulary maksimal |
+| `embed_dim` | `100` | Dimensi embedding Word2Vec |
+| `min_word_count` | `3` | Jumlah minimum kata untuk Word2Vec |
+| `w2v_epochs` | `30` | Epochs training Word2Vec |
+| `lstm_units_1` | `128` | Unit LSTM layer pertama |
+| `lstm_units_2` | `64` | Unit LSTM layer kedua |
+| `dropout_rate_1` | `0.3` | Dropout rate pertama |
+| `dropout_rate_2` | `0.3` | Dropout rate kedua |
+| `learning_rate` | `1e-4` | Learning rate Adam optimizer |
+| `batch_size` | `64` | Batch size training |
 | `epochs` | `150` | Maximum training epochs |
-| `num_trials` | `10` | Hyperparameter tuning trials |
+| `num_trials` | `10` | Jumlah trial hyperparameter tuning |
 
 ## Output Files
 
-After training, the following files are generated:
+Setelah training, file berikut dihasilkan:
 
-- `output/training_history_bilstm_word2vec.csv` - BiLSTM training history
-- `output/training_history_lstm_word2vec.csv` - LSTM training history
-- `output/evaluation_table_bilstm_word2vec.csv` - BiLSTM evaluation metrics
-- `output/evaluation_table_lstm_word2vec.csv` - LSTM evaluation metrics
-- `output/classification_report_bilstm_word2vec.csv` - BiLSTM classification report
-- `output/classification_report_lstm_word2vec.csv` - LSTM classification report
-- `output/predictions_test_bilstm_word2vec.csv` - BiLSTM predictions
-- `output/predictions_test_lstm_word2vec.csv` - LSTM predictions
-- `output/comparison_bilstm_vs_lstm.csv` - Model comparison
-- `models/bilstm_word2vec.keras` - Trained BiLSTM model
-- `models/lstm_word2vec.keras` - Trained LSTM model
+### Model
 
-## Pipeline Overview
+- `models/bilstm_word2vec.keras` — Model BiLSTM
+- `models/lstm_word2vec.keras` — Model LSTM
 
-1. **Data Loading**: Load from CSV or run OCR pipeline
-2. **Text Preprocessing**: Cleanse text, remove stopwords (Sastrawi)
-3. **Tokenization**: Keras Tokenizer with padding
-4. **Word2Vec Training**: Train embeddings on corpus
-5. **Hyperparameter Tuning**: Random search over parameter space
-6. **Model Training**: Train BiLSTM and LSTM with best params
-7. **Evaluation**: Generate metrics, confusion matrix, ROC curves
-8. **Export**: Save models, metrics, and comparison tables
+### Metrik & Laporan
 
-## Development
+- `output/training_history_bilstm_word2vec.csv` — History training BiLSTM
+- `output/training_history_lstm_word2vec.csv` — History training LSTM
+- `output/evaluation_table_bilstm_word2vec.csv` — Tabel evaluasi BiLSTM
+- `output/evaluation_table_lstm_word2vec.csv` — Tabel evaluasi LSTM
+- `output/classification_report_bilstm_word2vec.csv` — Classification report BiLSTM
+- `output/classification_report_lstm_word2vec.csv` — Classification report LSTM
+- `output/predictions_test_bilstm_word2vec.csv` — Prediksi BiLSTM
+- `output/predictions_test_lstm_word2vec.csv` — Prediksi LSTM
+- `output/comparison_bilstm_vs_lstm.csv` — Perbandingan kedua model
 
-```bash
-# Run with verbose logging
-python scripts/train.py -v train
+## Pipeline Training
 
-# Quick test with fewer epochs
-python scripts/train.py train --epochs 10 --num-trials 2
+1. **Data Loading** — Load dari CSV atau jalankan pipeline OCR
+2. **Text Preprocessing** — Cleansing teks, stopword removal (Sastrawi)
+3. **Tokenization** — Keras Tokenizer dengan padding
+4. **Word2Vec Training** — Training embedding pada korpus
+5. **Hyperparameter Tuning** — Random search atas ruang parameter
+6. **Model Training** — Training BiLSTM dan LSTM dengan parameter terbaik
+7. **Evaluasi** — Generate metrik, confusion matrix, ROC curves
+8. **Export** — Simpan model, metrik, dan tabel perbandingan
+
+## Struktur Project
+
+```
+ml-training/
+├── app/
+│   ├── config.py                    # Konfigurasi sentral
+│   ├── core/
+│   │   ├── preprocessing/           # Preprocessing gambar & teks
+│   │   │   ├── image.py
+│   │   │   └── text.py
+│   │   ├── ocr/                     # Tesseract OCR engine
+│   │   │   ├── engine.py
+│   │   │   ├── composition.py
+│   │   │   └── bold.py
+│   │   ├── embedding/
+│   │   │   └── word2vec.py          # Word2Vec training & embedding
+│   │   └── model/
+│   │       ├── architecture.py      # LSTM/BiLSTM model builder
+│   │       ├── tokenizer.py         # Keras tokenizer wrapper
+│   │       ├── tuner.py             # Hyperparameter tuning
+│   │       └── evaluator.py         # Metrik & plot evaluasi
+│   └── training/
+│       └── trainer.py               # Training orchestrator
+├── scripts/
+│   ├── train.py                     # CLI training
+│   └── evaluate.py                  # CLI evaluasi
+├── tests/
+├── requirements.txt
+└── .env.example
 ```
