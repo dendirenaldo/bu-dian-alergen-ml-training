@@ -2,10 +2,8 @@ numpy==1.26.4
 pandas==2.3.3
 opencv-python==4.11.0.86
 pytesseract==0.3.13
-pillow==11.3.0
-Sastrawi==1.0.1
-tensorflow==2.17.0
-gensim==4.3.2
+tensorflow==2.16.2
+gensim==4.3.3
 rapidfuzz==3.9.7
 scikit-learn==1.5.1
 matplotlib==3.9.4
@@ -15,9 +13,8 @@ python-dotenv==1.0.1
 click==8.1.0
 pytest==8.3.4
 
-# --- BERT (HuggingFace PyTorch, pluggable checkpoint) ---
+# --- BERT di HPC (artifacts/bert/): torch stack hanya untuk train_bert_hpc.py ---
+# Jalankan di HPC: pip install torch transformers scikit-learn pandas numpy accelerate
 torch>=2.2
 transformers>=4.40
-datasets>=2.18
 accelerate>=0.29
-tokenizers>=0.19

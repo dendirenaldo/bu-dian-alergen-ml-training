@@ -2,14 +2,15 @@
 
 Model BiLSTM final sudah dikunci lokal (`models_final/`, metrik `output_final/`).
 BERT dilatih di HPC dengan **data split yang byte-identik**, memakai skrip
-siap-pakai `bert_hpc/train_bert_hpc.py` (standalone: hanya butuh
+siap-pakai `artifacts/bert/train_bert_hpc.py` (standalone: hanya butuh
 `torch`, `transformers`, `scikit-learn`, `pandas`, `numpy`, `accelerate`).
 
 ## 0. Ringkasan langkah di HPC (copy-paste)
 
 ```bash
-# 1. Upload direktori bert_hpc/ dari repo lokal ke HPC, lalu masuk ke sana
-cd bert_hpc
+# 1. Upload ke HPC: direktori `artifacts/bert/` (berisi `train_bert_hpc.py` + `input/`),
+#    lalu masuk ke input:
+cd artifacts/bert
 
 # 2. Siapkan environment (GPU node, Python >=3.10)
 python3 -m venv venv && source venv/bin/activate
@@ -17,20 +18,20 @@ pip install --upgrade pip
 pip install torch transformers scikit-learn pandas numpy accelerate
 
 # 3. Verifikasi identitas split (WAJIB, cocokkan dengan split_contract.json)
-sha256sum train_combined.csv train_real.csv val.csv holdout.csv synthetic.csv
+sha256sum input/train_combined.csv input/train_real.csv input/val.csv input/holdout.csv input/synthetic.csv
 
 # 4. (Opsional, bila HF Hub diblokir) unduh model di login node dulu, lalu:
 # export HF_HUB_OFFLINE=1 HF_HOME=/path/cache
 
 # 5. Fine-tuning utama (IndoBERT, pool sama dengan BiLSTM).
 #    Cukup 1x GPU 16GB (batch 16, max_len 256). Estimasi ±10-20 menit.
-python train_bert_hpc.py --data-dir . --output-dir ./bert_hpc_results
+python train_bert_hpc.py --data-dir ./input --output-dir ./bert_hpc_results
 
 # 6. Hasil VAL + HOLDOUT @threshold 0.5 tercetak otomatis di akhir.
 #    Simpan/copy output terminal ini ke laporan.
 
 # 7. Ablasi opsional (tanpa synthetic — menjawab "synthetic membantu?")
-python train_bert_hpc.py --data-dir . --output-dir ./bert_hpc_results_realonly \
+python train_bert_hpc.py --data-dir ./input --output-dir ./bert_hpc_results_realonly \
     --train-file train_real.csv
 
 # 8. Bawa pulang SELURUH direktori bert_hpc_results*/
@@ -38,7 +39,7 @@ python train_bert_hpc.py --data-dir . --output-dir ./bert_hpc_results_realonly \
 
 ## 1. File yang dibawa ke HPC
 
-Dari `bu-dian-alergen-ml-training/bert_hpc/` (dibuat oleh `scripts/rebuild_split.py`):
+Dari `bu-dian-alergen-ml-training/artifacts/bert/input/` (dibuat oleh `scripts/rebuild_split.py`):
 
 | File | Isi | Peran |
 |---|---|---|
@@ -81,7 +82,9 @@ bert_hpc_results/
 ```
 
 Dengan `probs_*.csv`, CI bootstrap + kurva ROC/PR gabungan BiLSTM-vs-BERT
-dihitung lokal tanpa akses HPC (skrip `scripts/bootstrap_final.py` sebagai pola).
+dihitung lokal tanpa akses HPC (skrip `scripts/bootstrap_final.py` sebagai pola.
+
+> Hasil training diletakkan di `artifacts/bert/results/` (setara `artifacts/bilstm/`).).
 
 ## 4. Troubleshooting
 
@@ -95,7 +98,7 @@ dihitung lokal tanpa akses HPC (skrip `scripts/bootstrap_final.py` sebagai pola)
   `eval_strategy`/`warmup_ratio` tak ada). Bila masih error, upgrade:
   `pip install -U "transformers>=4.40"`. Cek versi: `pip show transformers`.
 - **Windows path berspasi** (mis. `D:\Dendi S3\...`): selalu jalankan dari
-  dalam direktori `bert_hpc` dan pakai path relatif (`.`, `./bert_hpc_results`)
+  dalam direktori `input` dan pakai path relatif (`.`, `./bert_hpc_results`)
   agar terhindar dari masalah quoting.
 
 ## 5. Aturan main (berlaku untuk BERT juga)

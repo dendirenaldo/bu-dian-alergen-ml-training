@@ -22,13 +22,15 @@ import pandas as pd
 
 
 @click.command()
-@click.option("--src-dir", default="./models_final", help="Direktori artefak training V5.")
+@click.option("--src-dir", default="./artifacts/bilstm/models", help="Direktori artefak training.")
 @click.option("--out-dir", default="../bu-dian-alergen-ml-service/models",
               help="Direktori model serving.")
-@click.option("--eval-csv", default="./output_final/evaluation_table_v5.csv",
+@click.option("--eval-csv", default="./artifacts/bilstm/output/evaluation_table_v5.csv",
               help="Tabel evaluasi untuk metadata.")
-@click.option("--frozen", default="./frozen_holdout_50.json", help="Frozen holdout.")
-def main(src_dir: str, out_dir: str, eval_csv: str, frozen: str) -> None:
+@click.option("--frozen", default="app/core/data/frozen_holdout.json", help="Frozen holdout.")
+@click.option("--threshold", type=float, default=0.5,
+              help="Threshold fixed (harus sama dengan V5_FIXED_THRESHOLD training).")
+def main(src_dir: str, out_dir: str, eval_csv: str, frozen: str, threshold: float) -> None:
     os.makedirs(out_dir, exist_ok=True)
 
     renames = {
@@ -56,8 +58,8 @@ def main(src_dir: str, out_dir: str, eval_csv: str, frozen: str) -> None:
     click.echo("  label_encoder.pkl (classes=['safe','unsafe'])")
 
     with open(os.path.join(out_dir, "thresholds.json"), "w", encoding="utf-8") as f:
-        json.dump({"bilstm": 0.5, "lstm": 0.5, "fixed": True}, f, indent=2)
-    click.echo("  thresholds.json (fixed 0.5)")
+        json.dump({"bilstm": float(threshold), "fixed": True}, f, indent=2)
+    click.echo(f"  thresholds.json (fixed {threshold})")
 
     try:
         git_sha = subprocess.check_output(
@@ -69,7 +71,7 @@ def main(src_dir: str, out_dir: str, eval_csv: str, frozen: str) -> None:
         git_sha = "unknown"
 
     metadata: dict = {"model": "bilstm_word2vec_v5", "git_sha": git_sha,
-                      "threshold_fixed": 0.5, "training_mode": "v5_parity"}
+                      "threshold_fixed": float(threshold), "pipeline": "v5"}
     if os.path.exists(eval_csv):
         ev = pd.read_csv(eval_csv)
         metadata["eval"] = ev.to_dict(orient="records")

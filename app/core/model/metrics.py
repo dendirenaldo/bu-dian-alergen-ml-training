@@ -354,3 +354,15 @@ def bootstrap_ci_metrics(
         rows.append({"metric": metric, "mean": float(np.mean(vals)), "lo": lo, "hi": hi,
                      "ci": ci, "n_bootstrap": n_bootstrap})
     return pd.DataFrame(rows)
+
+
+def write_thresholds(path: str, threshold: float = 0.5) -> dict:
+    """Tulis thresholds.json kanonis tunggal: {"bilstm": thr, "fixed": True}."""
+    import json as _json
+    import os as _os
+
+    payload = {"bilstm": float(threshold), "fixed": True}
+    _os.makedirs(_os.path.dirname(_os.path.abspath(path)), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        _json.dump(payload, f, indent=2)
+    return payload

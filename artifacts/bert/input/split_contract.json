@@ -1,0 +1,16 @@
+{
+  "seed": 42,
+  "train_real": 399,
+  "synthetic": 1000,
+  "train_combined": 1399,
+  "val": 50,
+  "holdout": 50,
+  "frozen_holdout_file": "frozen_holdout.json",
+  "sha256": {
+    "train_real.csv": "8e0172ebf15c323e9d9fdef76ef14107bdf23cc9faaaf87af47ffaf04bfa4ae3",
+    "synthetic.csv": "ab74027c3cb63df28468dc5cf535b38ddf43187901fdc46ef6c84b8a3a026e82",
+    "train_combined.csv": "64a5eb63cbd8fe6b28c10b3de7a7e53e47aa2142485d3c31c4c4a453b90367c4",
+    "val.csv": "56fb9ae934dc03d7b448a6c0f3ca37f7fc64b28a687166e4ea2ddb0dd7ad1af7",
+    "holdout.csv": "fcb707f24da6767f63ddd8c16bc91b49f20067a112123b155002c4b847fc9ab3"
+  }
+}

@@ -1,13 +1,13 @@
 """Fine-tuning BERT di HPC — kontrak apel-vs-apel dengan BiLSTM.
 
-Input : bert_hpc/{train_combined,val,holdout}.csv dari scripts/rebuild_split.py
+Input : artifacts/bert/input/{train_combined,val,holdout}.csv dari scripts/rebuild_split.py
 Aturan:
   - Early-stop & model-selection HANYA dari val.csv.
   - holdout.csv HANYA diprediksi sekali di akhir (tidak untuk tuning).
   - Metrik utama memakai threshold FIXED 0.5 (sama seperti BiLSTM).
 
 Contoh:
-  python train_bert_hpc.py --data-dir ./bert_hpc --output-dir ./bert_hpc_results
+  python train_bert_hpc.py --data-dir ./artifacts/bert/input --output-dir ./artifacts/bert/results
 """
 
 from __future__ import annotations

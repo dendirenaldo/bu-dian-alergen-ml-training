@@ -29,6 +29,12 @@ HOLDOUT_USED_IN_MODEL_FIT = False
 TRAIN_SHUFFLE = False
 
 
+def _packaged_frozen_path() -> str:
+    return os.path.join(
+        os.path.dirname(__file__), "..", "core", "data", "frozen_holdout.json"
+    )
+
+
 def _default_frozen_path() -> str:
     return os.path.join(
         os.path.dirname(__file__), "..", "core", "data", "frozen_holdout_notebook23.json"
@@ -38,15 +44,19 @@ def _default_frozen_path() -> str:
 def _load_frozen_products(config: Config, n_real: int) -> list[str] | None:
     """Tentukan daftar frozen holdout.
 
-    - Jika V5_FROZEN_HOLDOUT_PATH diset -> pakai file itu (re-derive lalu freeze).
-    - Jika tidak diset dan n_real == 114 -> pakai default notebook 23 (comparable).
-    - Jika tidak diset dan n_real != 114 -> None (re-derive deterministik),
-      panggil run_v5_split tanpa daftar agar solver memilih exact-target.
+    Urutan: V5_FROZEN_HOLDOUT_PATH eksplisit -> frozen_holdout.json kemasan
+    (kanonis 50/50) -> notebook23 bila n_real == 114 -> re-derive.
     """
     if config.v5.frozen_holdout_path:
         with open(config.v5.frozen_holdout_path, encoding="utf-8") as f:
             products = json.load(f)
         logger.info("Frozen holdout dari file: %s (%d)", config.v5.frozen_holdout_path, len(products))
+        return [str(x) for x in products]
+    packaged = _packaged_frozen_path()
+    if os.path.exists(packaged):
+        with open(packaged, encoding="utf-8") as f:
+            products = json.load(f)
+        logger.info("Frozen holdout kemasan: %s (%d)", packaged, len(products))
         return [str(x) for x in products]
     if n_real == 114:
         with open(_default_frozen_path(), encoding="utf-8") as f:
@@ -87,30 +97,21 @@ def run_v5_parity(config: Config | None = None) -> dict:
     assert v5.synthetic_source_contract == "real_train_only"
 
     # 2. Load data CSV tunggal -> model_source (label CSV = gold).
-    from app.core.data.gold_merge import build_model_source_from_single
+    from app.core.data.gold_merge import (
+        build_model_source_from_single,
+        standardize_columns,
+    )
 
     if not os.path.exists(config.csv_input):
         raise FileNotFoundError(f"CSV tidak ditemukan: {config.csv_input}")
     df_raw = pd.read_csv(
         config.csv_input, delimiter=config.csv_delimiter, encoding=config.csv_encoding
     )
-    # Petakan kolom generik -> kolom V5 bila perlu.
-    rename: dict[str, str] = {}
-    if v5.product_col not in df_raw.columns:
-        for cand in ("nama produk", "nama_produk", "product", "produk"):
-            if cand in df_raw.columns:
-                rename[cand] = v5.product_col
-                break
-    if config.text_col != v5.text_col and config.text_col in df_raw.columns:
-        rename[config.text_col] = v5.text_col
-    if config.label_col not in ("label",) and config.label_col in df_raw.columns:
-        rename[config.label_col] = "label"
-    if rename:
-        df_raw = df_raw.rename(columns=rename)
-    if v5.product_col not in df_raw.columns:
-        df_raw[v5.product_col] = [f"produk_{i}" for i in range(len(df_raw))]
-        logger.warning("Kolom produk tidak ada -> sintesis ID produk_{i} (group per-baris).")
-    text_src = v5.text_col if v5.text_col in df_raw.columns else config.text_col
+    df_raw = standardize_columns(
+        df_raw, product_col=v5.product_col,
+        text_col=config.text_col, label_col="label",
+    )
+    text_src = config.text_col if config.text_col in df_raw.columns else v5.text_col
     df_model_source = build_model_source_from_single(
         df_raw, product_col=v5.product_col, text_col=text_src, label_col="label",
     )
@@ -119,7 +120,7 @@ def run_v5_parity(config: Config | None = None) -> dict:
     logger.info("Gold distribution:\n%s", df_model_source["gold_label"].value_counts())
 
     # 3. KB vs Gold audit (diagnostik).
-    from app.core.model.v5_audit import kb_vs_gold_audit
+    from app.core.model.audit import kb_vs_gold_audit
 
     kb_audit = kb_vs_gold_audit(df_model_source)
     logger.info("KB vs Gold:\n%s", kb_audit["summary"].to_string(index=False))
@@ -174,7 +175,7 @@ def run_v5_parity(config: Config | None = None) -> dict:
     seed_all(config.seed)
     from app.core.model.tokenizer import Tokenizer
     from app.core.embedding.word2vec import build_embedding_matrix, train_word2vec
-    from app.core.preprocessing.text import fold_digits_v5, simple_tokenize_v5
+    from app.core.preprocessing.text import fold_digits_v5, simple_tokenize
 
     if v5.digit_fold:
         # Diterapkan ke SEMUA split sebelum tokenisasi (konsisten, tak bocor).
@@ -183,7 +184,7 @@ def run_v5_parity(config: Config | None = None) -> dict:
         X_holdout_text = [fold_digits_v5(t) for t in X_holdout_text]
         logger.info("digit_fold aktif: angka dilipat jadi 'num' di semua split")
 
-    train_tokens = [simple_tokenize_v5(t) for t in X_train_text]
+    train_tokens = [simple_tokenize(t) for t in X_train_text]
     tokenizer = Tokenizer(vocab_size=v5.vocab_size, max_len=v5.max_len)
     tokenizer.fit(X_train_text)
     TOKENIZER_FIT_SOURCE = "final_training_pool_only"
@@ -207,7 +208,7 @@ def run_v5_parity(config: Config | None = None) -> dict:
     embedding_matrix = embedding_matrix.astype("float32")
     embedding_matrix[0] = np.zeros((v5.embed_dim,), dtype="float32")
 
-    from app.core.model.v5_evaluate import oov_stats_for_sequences
+    from app.core.model.metrics import oov_stats_for_sequences
 
     oov_table = pd.DataFrame([
         {"split": "final_train", **oov_stats_for_sequences(
@@ -254,17 +255,18 @@ def run_v5_parity(config: Config | None = None) -> dict:
     assert TRAIN_SHUFFLE is False
 
     # 8. Evaluasi fixed threshold + artefak.
-    from app.core.model.v5_audit import (
+    from app.core.model.audit import (
         audit_pipeline_consistency_v5,
         audit_reproducibility_v5,
         triage_gold_kb_bilstm,
     )
-    from app.core.model.v5_evaluate import (
+    from app.core.model.metrics import (
         evaluate_fixed_threshold,
         plot_confusion_v5,
         plot_roc_pr_v5,
         save_training_curves_v5,
         write_experiment_manifest,
+        write_thresholds,
     )
 
     audit_pipeline_consistency_v5(df_real_train, df_real_val, df_holdout,
@@ -272,7 +274,8 @@ def run_v5_parity(config: Config | None = None) -> dict:
                                   HOLDOUT_USED_IN_MODEL_FIT, v5.fixed_threshold)
     audit_reproducibility_v5(config.seed, w2v_model.workers, w2v_model.seed,
                              TRAIN_SHUFFLE, v5.fixed_threshold,
-                             holdout_size=len(y_holdout))
+                             holdout_size=len(y_holdout),
+                             expected_holdout_size=v5.holdout_size)
 
     val_prob = model.predict(X_val_pad, verbose=0).ravel()
     holdout_prob = model.predict(X_holdout_pad, verbose=0).ravel()
@@ -300,10 +303,10 @@ def run_v5_parity(config: Config | None = None) -> dict:
                "synthetic_total": int(len(df_sintesis))},
     )
 
-    # 9. Simpan model + artefak registry.
+    # 9. Simpan model + artefak. Alias serving (bilstm_model.keras) HANYA
+    # ditulis oleh scripts/export_for_serving.py, bukan trainer.
     os.makedirs(config.model_dir, exist_ok=True)
     model.save(os.path.join(config.model_dir, "bilstm_word2vec_v5.keras"))
-    model.save(os.path.join(config.model_dir, "bilstm_model.keras"))
     try:
         w2v_model.save(os.path.join(config.model_dir, "word2vec_v5.model"))
     except Exception as e:
@@ -311,10 +314,12 @@ def run_v5_parity(config: Config | None = None) -> dict:
     with open(os.path.join(config.model_dir, "tokenizer_v5.pkl"), "wb") as f:
         pickle.dump(tokenizer, f)
     tokenizer.save_json(os.path.join(config.model_dir, "tokenizer_bilstm_v5.json"))
-    with open(os.path.join(config.output_dir, "thresholds_v5.json"), "w", encoding="utf-8") as f:
-        json.dump({"bilstm": v5.fixed_threshold, "fixed": True}, f, indent=2)
-    with open(os.path.join(config.model_dir, "thresholds.json"), "w", encoding="utf-8") as f:
-        json.dump({"bilstm": v5.fixed_threshold, "lstm": v5.fixed_threshold}, f, indent=2)
+    # Threshold kanonis tunggal (tidak ada lagi thresholds_v5.json ganda
+    # atau key "lstm" fiktif).
+    write_thresholds(os.path.join(config.output_dir, "thresholds.json"),
+                     v5.fixed_threshold)
+    write_thresholds(os.path.join(config.model_dir, "thresholds.json"),
+                     v5.fixed_threshold)
 
     logger.info("V5 parity selesai. Eval:\n%s", eval_table.to_string(index=False))
     logger.info("Manifest: %s", manifest_json)

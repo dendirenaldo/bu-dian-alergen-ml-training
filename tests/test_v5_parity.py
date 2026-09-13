@@ -141,7 +141,7 @@ def test_final_pool_audit_menolak_overlap():
 
 
 def test_evaluasi_threshold_fixed():
-    from app.core.model.v5_evaluate import evaluate_fixed_threshold
+    from app.core.model.metrics import evaluate_fixed_threshold
 
     y = np.array([0, 0, 1, 1])
     p = np.array([0.1, 0.4, 0.6, 0.9])
@@ -154,7 +154,7 @@ def test_evaluasi_threshold_fixed():
 
 def test_triage_tidak_tuning():
     from app.core.data.gold_merge import build_model_source_from_single
-    from app.core.model.v5_audit import triage_gold_kb_bilstm
+    from app.core.model.audit import triage_gold_kb_bilstm
 
     src = build_model_source_from_single(_toy_source())
     hold = src.iloc[[0, 4]].copy()  # 1 safe + 1 unsafe
@@ -163,31 +163,30 @@ def test_triage_tidak_tuning():
     assert (out["triage"]["error_triage"] != "UNCLASSIFIED").all()
 
 
-def test_repro_audit_strict_dan_non114_warning():
+def test_repro_audit_holdout_sesuai_kontrak():
     import os
 
-    from app.core.model.v5_audit import audit_reproducibility_v5
+    from app.core.model.audit import audit_reproducibility_v5
 
     os.environ["PYTHONHASHSEED"] = "42"
     os.environ["TF_DETERMINISTIC_OPS"] = "1"
     os.environ["TF_CUDNN_DETERMINISTIC"] = "1"
     os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
     os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
-    checks = audit_reproducibility_v5(holdout_size=23)
+    checks = audit_reproducibility_v5(holdout_size=50, expected_holdout_size=50)
     assert all(checks.values())
-    # Pool non-114: holdout != 23 diterima sebagai warning path.
-    checks2 = audit_reproducibility_v5(holdout_size=50)
-    assert all(checks2.values())
+    with pytest.raises(AssertionError):
+        audit_reproducibility_v5(holdout_size=23, expected_holdout_size=50)
     with pytest.raises(AssertionError):
         audit_reproducibility_v5(seed=123)
 
 
-def test_config_v5_defaults_sesuai_notebook():
+def test_config_defaults_final():
     from app.config import Config
 
     c = Config()
-    assert c.mode == "legacy"  # default aman; parity via --mode/TRAIN_MODE
-    # Default = konfigurasi FINAL terbaik (Fase 2-4), bukan angka notebook:
+    assert not hasattr(c, "mode") and not hasattr(c, "model_type")
+    # Konfigurasi FINAL terbaik (Fase 2-4):
     # split 50 (25/25), LR 1e-4 (D2), clip 1.0 (D1), mask (D3).
     assert c.v5.holdout_size == 50
     assert (c.v5.holdout_safe, c.v5.holdout_unsafe) == (25, 25)

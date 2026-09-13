@@ -3,12 +3,7 @@
 import re
 import logging
 
-from Sastrawi.StopWordRemover.StopWordRemoverFactory import StopWordRemoverFactory
-
 logger = logging.getLogger(__name__)
-
-_stopword_factory = StopWordRemoverFactory()
-STOPWORDS: set[str] = set(_stopword_factory.get_stop_words())
 
 
 def normalize_text(text: str) -> str:
@@ -78,43 +73,22 @@ def token_overlap_score(a: str, b: str) -> float:
 
 
 def cleanse_text(text: str) -> str:
-    """Cleanse text for model input: lowercase, remove special chars, normalize.
+    """Alias dari simple-tokenize-then-join (kompatibilitas baca OCR).
 
-    Args:
-        text: Raw text.
-
-    Returns:
-        Cleansed text.
+    Dipertahankan karena dipakai modul OCR; untuk model gunakan
+    simple_tokenize langsung.
     """
-    text = text.lower()
-    text = re.sub(r"[^a-z0-9\s]", " ", text)
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
+    return " ".join(simple_tokenize(text))
 
 
 def simple_tokenize(text: str) -> list[str]:
-    """Simple tokenize: lowercase, remove special chars, split on whitespace.
+    """Tokenisasi model: lowercase, remove special chars, split.
 
-    Args:
-        text: Input text.
-
-    Returns:
-        List of tokens.
+    Tanpa stopword removal (konsisten dengan Keras Tokenizer).
     """
     text = text.lower()
     text = re.sub(r"[^a-z0-9\s]", " ", text)
     return [tok for tok in text.split() if tok]
-
-
-def simple_tokenize_v5(text: str) -> list[str]:
-    """Tokenisasi parity Notebook V5 Cell 43 (tanpa stopword removal).
-
-    Dipakai untuk Word2Vec V5 agar konsisten dengan Keras Tokenizer
-    (yang juga tidak membuang stopwords). Pipeline legacy
-    (simple_tokenize + filter_tokens) tetap dipertahankan untuk
-    kompatibilitas.
-    """
-    return simple_tokenize(text)
 
 
 def fold_digits_v5(text: str) -> str:
@@ -127,20 +101,3 @@ def fold_digits_v5(text: str) -> str:
     """
     return re.sub(r"\d+", "num", str(text or ""))
 
-
-def filter_tokens(tokens: list[str]) -> list[str]:
-    """Filter tokens: remove stopwords, short tokens, and pure digits.
-
-    Args:
-        tokens: List of tokens.
-
-    Returns:
-        Filtered list of tokens.
-    """
-    return [
-        t
-        for t in tokens
-        if t not in STOPWORDS
-        and len(t) >= 2
-        and not t.isdigit()
-    ]

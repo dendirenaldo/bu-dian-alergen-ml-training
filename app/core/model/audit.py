@@ -100,9 +100,13 @@ def audit_reproducibility_v5(
     w2v_seed: int = 42,
     train_shuffle: bool = False,
     fixed_threshold: float = 0.50,
-    holdout_size: int = 23,
+    holdout_size: int | None = None,
+    expected_holdout_size: int = 50,
 ) -> dict:
-    """Audit lock randomness (port Cell 72). Raise bila gagal."""
+    """Audit lock randomness. Raise bila gagal.
+
+    Ukuran holdout wajib cocok kontrak config (bukan angka notebook lama).
+    """
     checks = {
         "SEED=42": seed == 42,
         "PYTHONHASHSEED=42": os.environ.get("PYTHONHASHSEED") == "42",
@@ -114,17 +118,11 @@ def audit_reproducibility_v5(
         "Word2Vec seed=42": w2v_seed == 42,
         "Train shuffle=False": train_shuffle is False,
         "Fixed threshold=0.50": fixed_threshold == 0.50,
-        "Frozen holdout=23": holdout_size == 23,
     }
-    # Untuk pool non-114 (holdout proporsional, lihat plan §2), ukuran
-    # holdout boleh beda — catat sebagai warning, bukan failure, selama
-    # holdout tetap frozen & tidak dipakai training.
-    if holdout_size != 23:
-        logger.warning(
-            "Holdout=%d (bukan 23 notebook) — diterima untuk pool non-114; "
-            "pastikan frozen & tidak dipakai training.", holdout_size,
+    if holdout_size is not None:
+        checks[f"Frozen holdout={expected_holdout_size}"] = (
+            holdout_size == expected_holdout_size
         )
-        checks["Frozen holdout=23"] = True
     if not all(checks.values()):
         bad = [k for k, v in checks.items() if not v]
         raise AssertionError(f"Reproducibility audit gagal: {bad}")

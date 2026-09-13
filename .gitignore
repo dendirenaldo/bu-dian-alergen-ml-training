@@ -51,6 +51,20 @@ models/*.pkl
 models/*.model
 models/*.bin
 models/*.npy
+artifacts/**/models/
+*.keras
+*.model
+tokenizer_*.pkl
+
+# Generated datasets (besar; kontraknya split_contract.json + skrip rebuild)
+artifacts/bert/input/*.csv
+artifacts/bert/results/
+
+# Training outputs (besar; yang kecil & penting di-track eksplisit via git add -f)
+artifacts/bilstm/output/*.png
+artifacts/bilstm/output/training_history_*.csv
+artifacts/bilstm/output/*triage*.csv
+artifacts/bilstm/output/frozen_holdout_*.csv
 
 # OCR output (generated, not source)
 ocr_output/

@@ -64,6 +64,39 @@ def attach_kb_columns(
     return out
 
 
+def standardize_columns(
+    df: pd.DataFrame,
+    product_col: str = "nama_produk",
+    text_col: str = "text",
+    label_col: str = "label",
+) -> pd.DataFrame:
+    """Samakan varian nama kolom CSV ke kanonis (satu-satunya shim kolom).
+
+    Kanonis: ``nama_produk`` / ``text`` / ``label``. Varian spasi
+    ("nama produk") dan generik ("product", "produk") dipetakan otomatis.
+    Bila kolom produk tak ada sama sekali, sintesis ID per-baris.
+    """
+    out = df.copy()
+    rename: dict[str, str] = {}
+    if product_col not in out.columns:
+        for cand in ("nama produk", "nama_produk", "product", "produk"):
+            if cand in out.columns:
+                rename[cand] = product_col
+                break
+    if text_col not in out.columns:
+        for cand in ("text", "komposisi", "composition"):
+            if cand in out.columns:
+                rename[cand] = text_col
+                break
+    if label_col not in out.columns and label_col != "label" and "label" in out.columns:
+        rename["label"] = label_col
+    if rename:
+        out = out.rename(columns=rename)
+    if product_col not in out.columns:
+        out[product_col] = [f"produk_{i}" for i in range(len(out))]
+    return out
+
+
 def build_model_source_from_single(
     df: pd.DataFrame,
     product_col: str = "nama_produk",

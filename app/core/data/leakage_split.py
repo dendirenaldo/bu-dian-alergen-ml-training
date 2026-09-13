@@ -145,15 +145,19 @@ def choose_components_exact_deterministic(
 
 def run_v5_split(
     df_model_source: pd.DataFrame,
+    *,
+    holdout_safe: int,
+    holdout_unsafe: int,
+    val_safe: int,
+    val_unsafe: int,
     product_col: str = "nama_produk",
     text_col: str = "text",
     frozen_products: list[str] | None = None,
-    holdout_safe: int = 2,
-    holdout_unsafe: int = 21,
-    val_safe: int = 2,
-    val_unsafe: int = 16,
 ) -> dict:
     """Jalankan split V5. Returns dict(df_real_train/df_real_val/df_holdout/...).
+
+    Komposisi (safe/unsafe) WAJIB eksplisit dari V5Config — tidak ada default
+    angka agar kontrak split tidak terfragmentasi.
 
     - Jika ``frozen_products`` diberikan: kunci holdout dari daftar itu
       (cocok by nama ternormalisasi), validasi komponen penuh.
