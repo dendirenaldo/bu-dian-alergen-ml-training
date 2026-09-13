@@ -1,6 +1,7 @@
 # Training BERT di HPC — Kontrak Perbandingan Apel-vs-apel
 
-Model BiLSTM final sudah dikunci lokal (`models_final/`, metrik `output_final/`).
+Model BiLSTM final sudah dikunci lokal (`artifacts/bilstm/models/`,
+metrik `artifacts/bilstm/output/`).
 BERT dilatih di HPC dengan **data split yang byte-identik**, memakai skrip
 siap-pakai `artifacts/bert/train_bert_hpc.py` (standalone: hanya butuh
 `torch`, `transformers`, `scikit-learn`, `pandas`, `numpy`, `accelerate`).
@@ -9,7 +10,7 @@ siap-pakai `artifacts/bert/train_bert_hpc.py` (standalone: hanya butuh
 
 ```bash
 # 1. Upload ke HPC: direktori `artifacts/bert/` (berisi `train_bert_hpc.py` + `input/`),
-#    lalu masuk ke input:
+#    lalu masuk ke sana:
 cd artifacts/bert
 
 # 2. Siapkan environment (GPU node, Python >=3.10)
@@ -25,16 +26,16 @@ sha256sum input/train_combined.csv input/train_real.csv input/val.csv input/hold
 
 # 5. Fine-tuning utama (IndoBERT, pool sama dengan BiLSTM).
 #    Cukup 1x GPU 16GB (batch 16, max_len 256). Estimasi ±10-20 menit.
-python train_bert_hpc.py --data-dir ./input --output-dir ./bert_hpc_results
+python train_bert_hpc.py --data-dir ./input --output-dir ./results
 
 # 6. Hasil VAL + HOLDOUT @threshold 0.5 tercetak otomatis di akhir.
 #    Simpan/copy output terminal ini ke laporan.
 
 # 7. Ablasi opsional (tanpa synthetic — menjawab "synthetic membantu?")
-python train_bert_hpc.py --data-dir ./input --output-dir ./bert_hpc_results_realonly \
+python train_bert_hpc.py --data-dir ./input --output-dir ./results_realonly \
     --train-file train_real.csv
 
-# 8. Bawa pulang SELURUH direktori bert_hpc_results*/
+# 8. Bawa pulang SELURUH direktori results*/
 ```
 
 ## 1. File yang dibawa ke HPC
@@ -70,7 +71,7 @@ lalu catat perubahan di laporan (hasil tidak lagi identik dengan default).
 ## 3. Artefak yang wajib dibawa pulang
 
 ```
-bert_hpc_results/
+results/
   metrics.json        # akurasi/presisi/recall/f1/roc_auc/ap @0.5, untuk val DAN holdout
   threshold.json      # {"threshold": 0.5, "fixed": true}
   training_log.json   # riwayat log per-epoch (loss + eval_accuracy/precision/recall/f1/roc_auc) u/ kurva
@@ -98,7 +99,7 @@ dihitung lokal tanpa akses HPC (skrip `scripts/bootstrap_final.py` sebagai pola.
   `eval_strategy`/`warmup_ratio` tak ada). Bila masih error, upgrade:
   `pip install -U "transformers>=4.40"`. Cek versi: `pip show transformers`.
 - **Windows path berspasi** (mis. `D:\Dendi S3\...`): selalu jalankan dari
-  dalam direktori `input` dan pakai path relatif (`.`, `./bert_hpc_results`)
+  jalankan dari `artifacts/bert/` dengan path relatif (`./input`, `./results`)
   agar terhindar dari masalah quoting.
 
 ## 5. Aturan main (berlaku untuk BERT juga)
