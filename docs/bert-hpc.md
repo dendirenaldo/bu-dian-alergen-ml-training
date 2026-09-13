@@ -82,7 +82,22 @@ bert_hpc_results/
 Dengan `probs_*.csv`, CI bootstrap + kurva ROC/PR gabungan BiLSTM-vs-BERT
 dihitung lokal tanpa akses HPC (skrip `scripts/bootstrap_final.py` sebagai pola).
 
-## 4. Aturan main (berlaku untuk BERT juga)
+## 4. Troubleshooting
+
+- **Baris `MISSING: those params were newly initialized...` saat load model.**
+  Ini NORMAL, bukan error: head klasifikasi (2 label) memang diinisialisasi
+  acak karena checkpoint pretrain tidak punya head tersebut. Training
+  (`trainer.train()`) yang akan melatihnya. Lanjutkan saja.
+- **`TypeError: TrainingArguments.__init__() got an unexpected keyword...`**
+  Versi `transformers` di mesin terlalu tua/berbeda nama argumen. Skrip sudah
+  dibuat toleran (otomatis pakai `evaluation_strategy`/`warmup_steps` bila
+  `eval_strategy`/`warmup_ratio` tak ada). Bila masih error, upgrade:
+  `pip install -U "transformers>=4.40"`. Cek versi: `pip show transformers`.
+- **Windows path berspasi** (mis. `D:\Dendi S3\...`): selalu jalankan dari
+  dalam direktori `bert_hpc` dan pakai path relatif (`.`, `./bert_hpc_results`)
+  agar terhindar dari masalah quoting.
+
+## 5. Aturan main (berlaku untuk BERT juga)
 
 1. Holdout tidak pernah menyentuh training/early-stop/tuning.
 2. Metrik utama = threshold 0.5, bukan threshold yang di-tuning di holdout.

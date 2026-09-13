@@ -114,25 +114,41 @@ def main():
     model = AutoModelForSequenceClassification.from_pretrained(
         args.model_name, num_labels=2)
 
-    targs = TrainingArguments(
+    import inspect as _inspect
+    _TA_PARAMS = set(_inspect.signature(TrainingArguments.__init__).parameters)
+
+    ta_kwargs = dict(
         output_dir=os.path.join(args.output_dir, "checkpoints"),
         num_train_epochs=args.epochs,
         per_device_train_batch_size=args.batch_size,
         per_device_eval_batch_size=32,
         learning_rate=args.lr,
         weight_decay=0.01,
-        warmup_ratio=0.1,
-        eval_strategy="epoch",
         save_strategy="epoch",
         load_best_model_at_end=True,
         metric_for_best_model="eval_loss",
         greater_is_better=False,
         seed=args.seed,
-        data_seed=args.seed,
         logging_steps=50,
-        save_total_limit=1,
-        report_to="none",
     )
+    # --- kompatibilitas lintas versi transformers ---
+    # transformers lama memakai 'evaluation_strategy', bukan 'eval_strategy'.
+    if "eval_strategy" in _TA_PARAMS:
+        ta_kwargs["eval_strategy"] = "epoch"
+    else:
+        ta_kwargs["evaluation_strategy"] = "epoch"
+    # 'warmup_ratio' tidak ada di transformers lama -> hitung warmup_steps
+    # manual (±10% total step). Bila keduanya tak ada, abaikan warmup.
+    if "warmup_ratio" in _TA_PARAMS:
+        ta_kwargs["warmup_ratio"] = 0.1
+    elif "warmup_steps" in _TA_PARAMS:
+        steps_per_epoch = max(1, len(tr_y) // args.batch_size)
+        ta_kwargs["warmup_steps"] = int(0.1 * steps_per_epoch * args.epochs)
+    for _k, _v in (("data_seed", args.seed), ("save_total_limit", 1),
+                   ("report_to", "none")):
+        if _k in _TA_PARAMS:
+            ta_kwargs[_k] = _v
+    targs = TrainingArguments(**ta_kwargs)
     trainer = Trainer(
         model=model, args=targs,
         train_dataset=TextDataset(tr_enc, tr_y),
