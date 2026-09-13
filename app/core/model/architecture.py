@@ -25,7 +25,9 @@ def build_model(
     recurrent_dropout: float = 0.2,
     dense_units: int = 64,
     dropout_rate_dense: float = 0.2,
-    gradient_clip_norm: float = 1.0,
+    gradient_clip_norm: float | None = 1.0,
+    mask_zero: bool = True,
+    use_maxnorm: bool = True,
 ) -> tf.keras.Model:
     """Build a Sequential LSTM or BiLSTM model.
 
@@ -43,7 +45,9 @@ def build_model(
         recurrent_dropout: Recurrent dropout (set to 0 for cuDNN compatibility).
         dense_units: Units for the dense layer.
         dropout_rate_dense: Dropout rate after the dense layer.
-        gradient_clip_norm: Gradient clipping norm value.
+        gradient_clip_norm: Gradient clipping norm value (None = disabled, V5 parity).
+        mask_zero: Mask PAD id=0 (V5 parity=False, mengikuti notebook).
+        use_maxnorm: Batasi Dense dengan MaxNorm(3) (V5 parity=False).
 
     Returns:
         Compiled Keras model.
@@ -57,7 +61,8 @@ def build_model(
             trainable=embed_trainable,
             # FIX (CRITICAL): PAD id=0 harus di-mask agar LSTM tidak
             # memproses padding sebagai token. Baris 0 embedding = nol.
-            mask_zero=True,
+            # V5 parity menonaktifkan ini agar persis notebook.
+            mask_zero=mask_zero,
         )
     )
 
@@ -76,14 +81,18 @@ def build_model(
         model.add(LSTM(lstm_units_2, **lstm_kwargs2))
     model.add(Dropout(dropout_2))
 
-    model.add(Dense(dense_units, activation="relu", kernel_constraint=MaxNorm(3)))
+    if use_maxnorm:
+        model.add(Dense(dense_units, activation="relu", kernel_constraint=MaxNorm(3)))
+    else:  # V5 parity: Dense polos seperti notebook.
+        model.add(Dense(dense_units, activation="relu"))
     model.add(Dropout(dropout_rate_dense))
     model.add(Dense(1, activation="sigmoid"))
 
+    adam_kwargs: dict = {"learning_rate": lr}
+    if gradient_clip_norm is not None:
+        adam_kwargs["clipnorm"] = gradient_clip_norm
     model.compile(
-        optimizer=tf.keras.optimizers.Adam(
-            learning_rate=lr, clipnorm=gradient_clip_norm
-        ),
+        optimizer=tf.keras.optimizers.Adam(**adam_kwargs),
         loss="binary_crossentropy",
         metrics=[
             "accuracy",

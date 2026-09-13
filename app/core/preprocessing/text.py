@@ -106,6 +106,17 @@ def simple_tokenize(text: str) -> list[str]:
     return [tok for tok in text.split() if tok]
 
 
+def simple_tokenize_v5(text: str) -> list[str]:
+    """Tokenisasi parity Notebook V5 Cell 43 (tanpa stopword removal).
+
+    Dipakai untuk Word2Vec V5 agar konsisten dengan Keras Tokenizer
+    (yang juga tidak membuang stopwords). Pipeline legacy
+    (simple_tokenize + filter_tokens) tetap dipertahankan untuk
+    kompatibilitas.
+    """
+    return simple_tokenize(text)
+
+
 def filter_tokens(tokens: list[str]) -> list[str]:
     """Filter tokens: remove stopwords, short tokens, and pure digits.
 

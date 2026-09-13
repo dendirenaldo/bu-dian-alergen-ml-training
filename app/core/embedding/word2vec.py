@@ -55,6 +55,8 @@ def build_embedding_matrix(
     word_index: dict[str, int],
     vocab_size: int,
     embed_dim: int,
+    init_scale: float = 0.1,
+    seed: int = 42,
 ) -> tuple[np.ndarray, int, int]:
     """Build an embedding matrix from a trained Word2Vec model.
 
@@ -66,6 +68,9 @@ def build_embedding_matrix(
         word_index: Keras tokenizer word_index mapping.
         vocab_size: Maximum vocabulary size.
         embed_dim: Embedding dimension.
+        init_scale: Std skala N(0) untuk kata tak terlihat.
+            Legacy=0.1; V5 parity (notebook Cell 43)=0.6.
+        seed: Random seed untuk init.
 
     Returns:
         Tuple of (embedding_matrix, num_words, hit_count).
@@ -73,8 +78,9 @@ def build_embedding_matrix(
     num_words = min(vocab_size, len(word_index) + 1)
     # FIX: init OOV kecil (scale 0.1, bukan 0.6) agar vektor acak tidak
     # mendominasi vektor Word2Vec terlatih (norm ~0.1-1.0). Seed agar stabil.
-    rng = np.random.RandomState(42)
-    embedding_matrix = rng.normal(scale=0.1, size=(num_words, embed_dim)).astype(
+    # V5 parity memakai scale 0.6 persis seperti notebook.
+    rng = np.random.RandomState(seed)
+    embedding_matrix = rng.normal(scale=init_scale, size=(num_words, embed_dim)).astype(
         np.float32
     )
     embedding_matrix[0] = np.zeros((embed_dim,), dtype=np.float32)

@@ -4,7 +4,12 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except ImportError:  # env ringan tanpa python-dotenv (mis. CI minimal)
+
+    def load_dotenv(*args, **kwargs):  # type: ignore[no-redef]
+        return False
 
 load_dotenv()
 
@@ -45,6 +50,105 @@ class BertConfig:
     batch_size_options: list = field(default_factory=lambda: [8, 16])
     num_trials: int = field(
         default_factory=lambda: int(os.getenv("BERT_NUM_TRIALS", "3"))
+    )
+
+
+@dataclass
+class V5Config:
+    """Kontrak eksperimen V5 leakage-safe (port Notebook Cell 25/26/35).
+
+    Nilai default = angka notebook untuk pool 114 real.
+    Untuk pool berukuran lain (mis. 499 CSV lokal), isi holdout/val
+    eksplisit via env/CLI atau biarkan solver me-raise dengan pesan jelas.
+    """
+
+    # --- Split contract (notebook: 114 = 73/18/23) ---
+    holdout_size: int = field(
+        default_factory=lambda: int(os.getenv("V5_HOLDOUT_SIZE", "23"))
+    )
+    holdout_safe: int = field(
+        default_factory=lambda: int(os.getenv("V5_HOLDOUT_SAFE", "2"))
+    )
+    holdout_unsafe: int = field(
+        default_factory=lambda: int(os.getenv("V5_HOLDOUT_UNSAFE", "21"))
+    )
+    val_safe: int = field(default_factory=lambda: int(os.getenv("V5_VAL_SAFE", "2")))
+    val_unsafe: int = field(
+        default_factory=lambda: int(os.getenv("V5_VAL_UNSAFE", "16"))
+    )
+    # Jika None -> pakai daftar notebook 23 (ada di frozen_holdout_default.json).
+    # Jika path JSON ada -> kunci dari file itu (re-derive lalu freeze).
+    frozen_holdout_path: str | None = field(
+        default_factory=lambda: os.getenv("V5_FROZEN_HOLDOUT_PATH") or None
+    )
+
+    # --- Synthetic (notebook Cell 19/40) ---
+    synthetic_total: int = field(
+        default_factory=lambda: int(os.getenv("V5_SYNTHETIC_TOTAL", "1000"))
+    )
+    synthetic_source_contract: str = "real_train_only"
+
+    # --- Threshold (notebook: FIXED, never tuned) ---
+    fixed_threshold: float = field(
+        default_factory=lambda: float(os.getenv("V5_FIXED_THRESHOLD", "0.5"))
+    )
+
+    # --- NLP parity (notebook Cell 43) ---
+    vocab_size: int = 20000
+    max_len: int = 120
+    embed_dim: int = 100
+    w2v_window: int = 5
+    w2v_min_count: int = 1
+    w2v_epochs: int = 20
+    w2v_seed: int = 42
+    embedding_init_scale: float = 0.6
+    embed_trainable: bool = True
+
+    # --- Model parity (notebook Cell 25/45, single-run, no tuning) ---
+    lstm_units_1: int = 128
+    lstm_units_2: int = 64
+    dropout_1: float = 0.3
+    dropout_2: float = 0.3
+    dense_units: int = 64
+    dropout_dense: float = 0.2
+    # Deviasi stabilitas D2: LR default 1e-4, bukan 1e-3 notebook.
+    # Bukti: run baseline LR 1e-3 collapse di epoch 2 (train acc 0.57->0.48,
+    # model flip all-unsafe->all-safe, prob holdout std 0.0008 = degenerat;
+    # clipping saja tidak menyembuhkan). Diag LR 1e-4: learning monoton
+    # sehat 4 epoch (train acc 0.47->0.68, val AUC ~0.95, tanpa collapse).
+    # Semua kontrak V5 lain dipertahankan (split/synthetic/threshold/audit).
+    learning_rate: float = field(
+        default_factory=lambda: float(os.getenv("V5_LEARNING_RATE", "1e-4"))
+    )
+    batch_size: int = 16
+    epochs: int = field(
+        default_factory=lambda: int(os.getenv("V5_EPOCHS", "20"))
+    )
+    early_stopping_patience: int = 4
+    lr_reduce_patience: int = 3
+    lr_reduce_factor: float = 0.5
+    min_lr: float = 1e-6
+    train_shuffle: bool = False
+    # Deviasi stabilitas D1: gradient clipping (None = parity notebook).
+    # Notebook Cell 45 tidak pakai clipnorm; run baseline membuktikan
+    # training collapse setelah epoch 1 (loss spike 0.74->0.73, model
+    # flip all-unsafe->all-safe, prob holdout std 0.0008 = degenerat).
+    # Legacy pipeline sudah memakai clipnorm=1.0.
+    gradient_clip_norm: float | None = field(
+        default_factory=lambda: (
+            float(os.getenv("V5_GRADIENT_CLIP_NORM"))
+            if os.getenv("V5_GRADIENT_CLIP_NORM")
+            else None
+        )
+    )
+
+    # --- Kolom ---
+    product_col: str = field(
+        default_factory=lambda: os.getenv("V5_PRODUCT_COL", "nama_produk")
+    )
+    text_col: str = field(default_factory=lambda: os.getenv("V5_TEXT_COL", "text"))
+    gold_label_col: str = field(
+        default_factory=lambda: os.getenv("V5_GOLD_LABEL_COL", "gold_label")
     )
 
 
@@ -134,6 +238,11 @@ class Config:
     default_threshold: float = field(
         default_factory=lambda: float(os.getenv("DEFAULT_THRESHOLD", "0.5"))
     )
+    # --- Pipeline mode: 'legacy' (tuning+threshold-tuning) | 'v5_parity' (ikuti notebook) ---
+    mode: str = field(
+        default_factory=lambda: os.getenv("TRAIN_MODE", "legacy").lower()
+    )
+    v5: V5Config = field(default_factory=V5Config)
 
     def ensure_dirs(self) -> None:
         """Create output directories if they don't exist."""

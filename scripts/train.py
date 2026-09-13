@@ -12,7 +12,6 @@ import click
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.config import Config
-from app.training.trainer import run_training
 
 
 @click.group()
@@ -39,6 +38,12 @@ def cli(verbose: bool) -> None:
 @click.option("--model", "model_type",
               type=click.Choice(["bilstm", "lstm", "bert", "all"], case_sensitive=False),
               help="Model yang dilatih (default: all).")
+@click.option("--mode", "train_mode",
+              type=click.Choice(["legacy", "v5-parity", "v5_parity"], case_sensitive=False),
+              default=None,
+              help="Pipeline: legacy (tuning) atau v5-parity (ikuti notebook, default dari TRAIN_MODE).")
+@click.option("--frozen-holdout", "frozen_holdout_path", type=click.Path(exists=True), default=None,
+              help="JSON daftar frozen holdout (re-derive lalu freeze). Default: notebook23 bila n=114.")
 @click.option("--bert-model", "bert_model_name", type=str, default=None,
               help="Nama checkpoint HF BERT (mis. indobenchmark/indobert-base-p1). "
                    "Pluggable: ganti tanpa ubah kode untuk coba varian lain.")
@@ -54,11 +59,13 @@ def train(
     batch_size: int | None,
     seed: int | None,
     model_type: str | None,
+    train_mode: str | None,
+    frozen_holdout_path: str | None,
     bert_model_name: str | None,
     bert_epochs: int | None,
     bert_lr: float | None,
 ) -> None:
-    """Train BiLSTM and LSTM models with hyperparameter tuning."""
+    """Train models (legacy tuning atau V5 parity leakage-safe)."""
     if config_file:
         from dotenv import load_dotenv
 
@@ -88,6 +95,34 @@ def train(
         config.bert.epochs = bert_epochs
     if bert_lr is not None:
         config.bert.learning_rate = bert_lr
+    if train_mode is not None:
+        config.mode = train_mode.lower().replace("-", "_")
+    if frozen_holdout_path is not None:
+        config.v5.frozen_holdout_path = frozen_holdout_path
+
+    if config.mode == "v5_parity":
+        click.echo("Starting V5 parity pipeline (ikuti notebook: fixed, leakage-safe)...")
+        click.echo(f"  CSV: {config.csv_input}")
+        click.echo(f"  Output dir: {config.output_dir}")
+        click.echo(f"  Model dir: {config.model_dir}")
+        click.echo(f"  Seed: {config.seed} | Threshold fixed: {config.v5.fixed_threshold}")
+        click.echo(f"  Holdout target: {config.v5.holdout_safe}/{config.v5.holdout_unsafe} "
+                   f"dari {config.v5.holdout_size} | Val: {config.v5.val_safe}/{config.v5.val_unsafe}")
+        click.echo(f"  Synthetic: {config.v5.synthetic_total} ({config.v5.synthetic_source_contract})")
+        try:
+            from app.training.trainer_v5 import run_v5_parity
+
+            results = run_v5_parity(config)
+        except Exception as e:
+            click.echo(f"V5 training failed: {e}", err=True)
+            raise SystemExit(1)
+
+        click.echo("\nV5 training complete!")
+        click.echo(f"Pool: {results.get('pool_sizes', {})}")
+        click.echo(f"Threshold: {results.get('threshold')}")
+        click.echo(f"\nResults saved to: {config.output_dir}")
+        click.echo(f"Models saved to: {config.model_dir}")
+        return
 
     click.echo("Starting training pipeline...")
     click.echo(f"  Data source: {config.data_source_mode}")
@@ -102,6 +137,8 @@ def train(
                    f"lr={config.bert.learning_rate})")
 
     try:
+        from app.training.trainer import run_training
+
         results = run_training(config)
     except Exception as e:
         click.echo(f"Training failed: {e}", err=True)
@@ -139,6 +176,10 @@ def info() -> None:
     click.echo(f"  BERT model: {config.bert.model_name}")
     click.echo(f"  BERT max len: {config.bert.max_len}")
     click.echo(f"  Num tuning trials: {config.num_trials}")
+    click.echo(f"  Mode: {config.mode}")
+    click.echo(f"  V5 holdout: {config.v5.holdout_safe}/{config.v5.holdout_unsafe} "
+               f"dari {config.v5.holdout_size} | val: {config.v5.val_safe}/{config.v5.val_unsafe}")
+    click.echo(f"  V5 synthetic: {config.v5.synthetic_total} | threshold: {config.v5.fixed_threshold}")
 
 
 if __name__ == "__main__":

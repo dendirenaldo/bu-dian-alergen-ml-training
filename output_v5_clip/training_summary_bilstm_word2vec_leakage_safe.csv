@@ -1,0 +1,2 @@
+best_epoch,best_val_loss,train_accuracy_at_best,val_accuracy_at_best,train_f1_at_best,val_f1_at_best
+1,0.6250722408294678,0.5699588656425476,0.8888888955116272,0.577208358668297,0.9411764693179364
