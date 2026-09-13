@@ -17,6 +17,7 @@ import json
 import math
 import os
 import random
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -73,7 +74,28 @@ def metrics_at_threshold(y_true, y_prob, threshold=0.5):
     }
 
 
+def compute_eval_metrics(eval_pred):
+    """Metrik evaluasi tiap epoch ala verbose TensorFlow.
+
+    Dipakai via Trainer(compute_metrics=...). Threshold fixed 0.5,
+    sama seperti metrik utama. Tidak memengaruhi seleksi model
+    (tetap eval_loss) maupun bobot.
+    """
+    logits, labels = eval_pred.predictions, eval_pred.label_ids
+    m = logits.max(axis=1, keepdims=True)
+    e = np.exp(logits - m)
+    prob = (e / e.sum(axis=1, keepdims=True))[:, 1]
+    full = metrics_at_threshold(np.asarray(labels), prob, threshold=0.5)
+    return {k: v for k, v in full.items()
+            if k in ("accuracy", "precision", "recall", "f1",
+                     "roc_auc", "average_precision")}
+
+
 def main():
+    # Senyapkan warning kosmetik internal HF Trainer (agregasi loss skalar).
+    # Tidak memengaruhi bobot/hasil.
+    warnings.filterwarnings(
+        "ignore", message="Was asked to gather along dimension 0.*")
     ap = argparse.ArgumentParser()
     ap.add_argument("--data-dir", default="./bert_hpc")
     ap.add_argument("--output-dir", default="./bert_hpc_results")
@@ -111,8 +133,12 @@ def main():
     tr_y = train_df["label"].str.lower().map(LABEL2ID).astype(int).tolist()
     va_y = val_df["label"].str.lower().map(LABEL2ID).astype(int).tolist()
 
+    # Peta label eksplisit: menimpa id2label basi (5 label) bawaan config
+    # IndoBERT sekaligus membuat artefak model/ bersih untuk serving.
     model = AutoModelForSequenceClassification.from_pretrained(
-        args.model_name, num_labels=2)
+        args.model_name, num_labels=2,
+        id2label={0: "safe", 1: "unsafe"},
+        label2id={"safe": 0, "unsafe": 1})
 
     import inspect as _inspect
     _TA_PARAMS = set(_inspect.signature(TrainingArguments.__init__).parameters)
@@ -145,7 +171,7 @@ def main():
         steps_per_epoch = max(1, len(tr_y) // args.batch_size)
         ta_kwargs["warmup_steps"] = int(0.1 * steps_per_epoch * args.epochs)
     for _k, _v in (("data_seed", args.seed), ("save_total_limit", 1),
-                   ("report_to", "none")):
+                   ("report_to", "none"), ("max_grad_norm", 1.0)):
         if _k in _TA_PARAMS:
             ta_kwargs[_k] = _v
     targs = TrainingArguments(**ta_kwargs)
@@ -153,9 +179,14 @@ def main():
         model=model, args=targs,
         train_dataset=TextDataset(tr_enc, tr_y),
         eval_dataset=TextDataset(va_enc, va_y),
+        compute_metrics=compute_eval_metrics,
         callbacks=[EarlyStoppingCallback(early_stopping_patience=args.patience)],
     )
     trainer.train()
+
+    # Riwayat log per-epoch (loss/train + eval_*) untuk kurva skripsi.
+    with open(os.path.join(args.output_dir, "training_log.json"), "w") as f:
+        json.dump(trainer.state.log_history, f, indent=2, default=float)
 
     def predict_probs(df):
         enc = encode(df["text"].fillna("").astype(str))

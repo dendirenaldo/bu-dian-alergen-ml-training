@@ -72,6 +72,7 @@ lalu catat perubahan di laporan (hasil tidak lagi identik dengan default).
 bert_hpc_results/
   metrics.json        # akurasi/presisi/recall/f1/roc_auc/ap @0.5, untuk val DAN holdout
   threshold.json      # {"threshold": 0.5, "fixed": true}
+  training_log.json   # riwayat log per-epoch (loss + eval_accuracy/precision/recall/f1/roc_auc) u/ kurva
   probs_val.csv       # kolom: text, label, prob_unsafe
   probs_holdout.csv   # kolom: text, label, prob_unsafe
   roc_data.json       # fpr/tpr val + holdout (untuk plot gabungan + CI)
