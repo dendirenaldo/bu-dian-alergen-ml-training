@@ -174,7 +174,14 @@ def run_v5_parity(config: Config | None = None) -> dict:
     seed_all(config.seed)
     from app.core.model.tokenizer import Tokenizer
     from app.core.embedding.word2vec import build_embedding_matrix, train_word2vec
-    from app.core.preprocessing.text import simple_tokenize_v5
+    from app.core.preprocessing.text import fold_digits_v5, simple_tokenize_v5
+
+    if v5.digit_fold:
+        # Diterapkan ke SEMUA split sebelum tokenisasi (konsisten, tak bocor).
+        X_train_text = [fold_digits_v5(t) for t in X_train_text]
+        X_val_text = [fold_digits_v5(t) for t in X_val_text]
+        X_holdout_text = [fold_digits_v5(t) for t in X_holdout_text]
+        logger.info("digit_fold aktif: angka dilipat jadi 'num' di semua split")
 
     train_tokens = [simple_tokenize_v5(t) for t in X_train_text]
     tokenizer = Tokenizer(vocab_size=v5.vocab_size, max_len=v5.max_len)
@@ -225,7 +232,7 @@ def run_v5_parity(config: Config | None = None) -> dict:
         v5.learning_rate, num_words, v5.embed_dim, embedding_matrix,
         embed_trainable=v5.embed_trainable, recurrent_dropout=0.0,
         dense_units=v5.dense_units, dropout_rate_dense=v5.dropout_dense,
-        gradient_clip_norm=v5.gradient_clip_norm, mask_zero=False, use_maxnorm=False,
+        gradient_clip_norm=v5.gradient_clip_norm, mask_zero=v5.mask_zero, use_maxnorm=False,
     )
     callbacks = [
         EarlyStopping(monitor="val_loss", patience=v5.early_stopping_patience,
@@ -233,6 +240,11 @@ def run_v5_parity(config: Config | None = None) -> dict:
         ReduceLROnPlateau(monitor="val_loss", factor=v5.lr_reduce_factor,
                           patience=v5.lr_reduce_patience, min_lr=v5.min_lr),
     ]
+    if v5.preshuffle:
+        rng = np.random.RandomState(config.seed)
+        perm = rng.permutation(len(y_train))
+        X_train_pad, y_train = X_train_pad[perm], y_train[perm]
+        logger.info("preshuffle aktif: urutan train diacak deterministik (seed=%d)", config.seed)
     history = model.fit(
         X_train_pad, y_train, validation_data=(X_val_pad, y_val),
         epochs=v5.epochs, batch_size=v5.batch_size,

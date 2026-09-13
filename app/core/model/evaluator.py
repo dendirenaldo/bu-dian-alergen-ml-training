@@ -54,7 +54,7 @@ def plot_training_history(history: object, model_name: str, output_dir: str) -> 
         axes[0].plot(hist["auc"], alpha=0.5, label="train_auc")
     if "val_auc" in hist.columns:
         axes[0].plot(hist["val_auc"], alpha=0.5, label="val_auc")
-    axes[0].set_title(f"{model_name} - Accuracy/F1/AUC")
+    # Judul figure dihapus: caption ditulis di dokumen Word.
     axes[0].set_xlabel("Epoch")
     axes[0].set_ylabel("Score")
     axes[0].grid(alpha=0.3)
@@ -63,7 +63,7 @@ def plot_training_history(history: object, model_name: str, output_dir: str) -> 
     axes[1].plot(hist["loss"], label="train_loss")
     if "val_loss" in hist.columns:
         axes[1].plot(hist["val_loss"], label="val_loss")
-    axes[1].set_title(f"{model_name} - Loss")
+    # Judul figure dihapus: caption ditulis di dokumen Word.
     axes[1].set_xlabel("Epoch")
     axes[1].set_ylabel("Loss")
     axes[1].grid(alpha=0.3)
@@ -76,7 +76,7 @@ def plot_training_history(history: object, model_name: str, output_dir: str) -> 
         axes[2].plot(hist["recall"], label="train_recall")
     if "val_recall" in hist.columns:
         axes[2].plot(hist["val_recall"], label="val_recall")
-    axes[2].set_title(f"{model_name} - Precision/Recall")
+    # Judul figure dihapus: caption ditulis di dokumen Word.
     axes[2].set_xlabel("Epoch")
     axes[2].set_ylabel("Score")
     axes[2].grid(alpha=0.3)
@@ -248,7 +248,7 @@ def evaluate_model(
         yticklabels=target_names if len(target_names) == 2 else ["0", "1"],
         ax=axes[0],
     )
-    axes[0].set_title(f"{model_name} - Confusion Matrix")
+    # Judul figure dihapus: caption ditulis di dokumen Word.
     axes[0].set_xlabel("Predicted")
     axes[0].set_ylabel("Actual")
 
@@ -264,7 +264,7 @@ def evaluate_model(
     axes[1].set_ylim([0.0, 1.05])
     axes[1].set_xlabel("False Positive Rate")
     axes[1].set_ylabel("True Positive Rate")
-    axes[1].set_title(f"{model_name} - ROC Curve")
+    # Judul figure dihapus: caption ditulis di dokumen Word.
     axes[1].legend(loc="lower right")
     axes[1].grid(alpha=0.3)
     plt.tight_layout()
@@ -349,7 +349,7 @@ def plot_roc_comparison(
     plt.ylim([0.0, 1.05])
     plt.xlabel("False Positive Rate")
     plt.ylabel("True Positive Rate")
-    plt.title(title)
+    # Judul figure dihapus: caption ditulis di dokumen Word.
     plt.legend(loc="lower right")
     plt.grid(alpha=0.3)
     plt.tight_layout()

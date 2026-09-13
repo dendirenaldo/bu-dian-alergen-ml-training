@@ -1,0 +1,26 @@
+{
+  "experiment": "Experiment 1 — Reproducible Leakage-Safe BiLSTM (port)",
+  "seed": 42,
+  "threshold": 0.5,
+  "holdout_size": 50,
+  "holdout_frozen": true,
+  "gold_label_is_ground_truth": true,
+  "synthetic_after_real_split": true,
+  "synthetic_source": "real_train_only",
+  "tokenizer_fit_source": "final_training_pool_only",
+  "word2vec_workers": 1,
+  "architecture_unchanged": true,
+  "required_audits": [
+    "group leakage",
+    "exact OCR text overlap",
+    "split manifest",
+    "validation curves",
+    "frozen holdout curves",
+    "ROC-AUC",
+    "precision-recall",
+    "confusion matrix"
+  ],
+  "train_size": 1399,
+  "val_size": 50,
+  "synthetic_total": 1000
+}

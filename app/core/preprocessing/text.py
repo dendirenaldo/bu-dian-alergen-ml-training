@@ -117,6 +117,17 @@ def simple_tokenize_v5(text: str) -> list[str]:
     return simple_tokenize(text)
 
 
+def fold_digits_v5(text: str) -> str:
+    """Lipastoken angka menjadi 'num' (deviasi preprocessing Fase 2).
+
+    Rasional (audit Fase 1): 132 token murni-digit di real-train
+    memecah vocab ('8','70','150',...) padahal maknanya setara
+    (persentase/takaran). Diterapkan konsisten ke train/val/holdout
+    SEBELUM tokenisasi agar tidak bocor.
+    """
+    return re.sub(r"\d+", "num", str(text or ""))
+
+
 def filter_tokens(tokens: list[str]) -> list[str]:
     """Filter tokens: remove stopwords, short tokens, and pure digits.
 

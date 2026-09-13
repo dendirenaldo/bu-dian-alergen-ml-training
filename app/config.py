@@ -62,19 +62,21 @@ class V5Config:
     eksplisit via env/CLI atau biarkan solver me-raise dengan pesan jelas.
     """
 
-    # --- Split contract (notebook: 114 = 73/18/23) ---
+    # --- Split contract FINAL (revisi Fase 4, split lama 23 kedaluwarsa) ---
+    # val/holdout 50 (25/25) agar metrik stabil: 1 sampel = 2% (dulu 5.6%).
+    # Derivation deterministik + audit leakage PASS, di-freeze ulang.
     holdout_size: int = field(
-        default_factory=lambda: int(os.getenv("V5_HOLDOUT_SIZE", "23"))
+        default_factory=lambda: int(os.getenv("V5_HOLDOUT_SIZE", "50"))
     )
     holdout_safe: int = field(
-        default_factory=lambda: int(os.getenv("V5_HOLDOUT_SAFE", "2"))
+        default_factory=lambda: int(os.getenv("V5_HOLDOUT_SAFE", "25"))
     )
     holdout_unsafe: int = field(
-        default_factory=lambda: int(os.getenv("V5_HOLDOUT_UNSAFE", "21"))
+        default_factory=lambda: int(os.getenv("V5_HOLDOUT_UNSAFE", "25"))
     )
-    val_safe: int = field(default_factory=lambda: int(os.getenv("V5_VAL_SAFE", "2")))
+    val_safe: int = field(default_factory=lambda: int(os.getenv("V5_VAL_SAFE", "25")))
     val_unsafe: int = field(
-        default_factory=lambda: int(os.getenv("V5_VAL_UNSAFE", "16"))
+        default_factory=lambda: int(os.getenv("V5_VAL_UNSAFE", "25"))
     )
     # Jika None -> pakai daftar notebook 23 (ada di frozen_holdout_default.json).
     # Jika path JSON ada -> kunci dari file itu (re-derive lalu freeze).
@@ -95,14 +97,29 @@ class V5Config:
 
     # --- NLP parity (notebook Cell 43) ---
     vocab_size: int = 20000
-    max_len: int = 120
+    max_len: int = field(
+        default_factory=lambda: int(os.getenv("V5_MAX_LEN", "120"))
+    )
     embed_dim: int = 100
     w2v_window: int = 5
-    w2v_min_count: int = 1
+    w2v_min_count: int = field(
+        default_factory=lambda: int(os.getenv("V5_W2V_MIN_COUNT", "1"))
+    )
     w2v_epochs: int = 20
     w2v_seed: int = 42
     embedding_init_scale: float = 0.6
     embed_trainable: bool = True
+    # Deviasi D3: mask_zero default True (terbaik hasil Fase 2-3).
+    # Bukti full-run 20ep: mask (S2) val_loss 0.063 + val AUC 1.0 vs
+    # tanpa-mask (S1) val_loss 0.166 + AUC 0.969. Padding 71-85%
+    # pada MAX_LEN=120 adalah noise bagi LSTM bila tidak di-mask.
+    # Notebook parity (False) tetap bisa via V5_MASK_ZERO=0.
+    mask_zero: bool = field(
+        default_factory=lambda: os.getenv("V5_MASK_ZERO", "1") == "1"
+    )
+    digit_fold: bool = field(
+        default_factory=lambda: os.getenv("V5_DIGIT_FOLD", "0") == "1"
+    )
 
     # --- Model parity (notebook Cell 25/45, single-run, no tuning) ---
     lstm_units_1: int = 128
@@ -129,16 +146,22 @@ class V5Config:
     lr_reduce_factor: float = 0.5
     min_lr: float = 1e-6
     train_shuffle: bool = False
-    # Deviasi stabilitas D1: gradient clipping (None = parity notebook).
-    # Notebook Cell 45 tidak pakai clipnorm; run baseline membuktikan
-    # training collapse setelah epoch 1 (loss spike 0.74->0.73, model
-    # flip all-unsafe->all-safe, prob holdout std 0.0008 = degenerat).
-    # Legacy pipeline sudah memakai clipnorm=1.0.
+    # Deviasi Fase 3: pre-shuffle deterministik SEKALI sebelum fit.
+    # shuffle=False + urutan real‖synthetic membuat gradien berosilasi
+    # mengikuti blok distribusi. Pre-shuffle dengan RandomState(seed)
+    # mencampur blok namun 100% reproducible (bukan shuffle acak TF).
+    # V5_SHUFFLE=0 -> parity notebook (tanpa shuffle).
+    preshuffle: bool = field(
+        default_factory=lambda: os.getenv("V5_SHUFFLE", "0") == "1"
+    )
+    # Deviasi stabilitas D1: gradient clipping default 1.0.
+    # Bukti: run baseline LR 1e-3 tanpa clip collapse di epoch 2
+    # (model flip all-unsafe->all-safe). Legacy pipeline memakai 1.0.
     gradient_clip_norm: float | None = field(
         default_factory=lambda: (
             float(os.getenv("V5_GRADIENT_CLIP_NORM"))
             if os.getenv("V5_GRADIENT_CLIP_NORM")
-            else None
+            else 1.0
         )
     )
 

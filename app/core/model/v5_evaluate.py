@@ -58,7 +58,7 @@ def save_training_curves_v5(
     plt.plot(hist["accuracy"], linewidth=2, label="Train Accuracy")
     if "val_accuracy" in hist.columns:
         plt.plot(hist["val_accuracy"], linewidth=2, label="Validation Accuracy")
-    plt.title("Training vs Validation Accuracy")
+    # Judul figure dihapus: caption ditulis di dokumen Word.
     plt.xlabel("Epoch")
     plt.ylabel("Accuracy")
     plt.grid(True, alpha=0.3)
@@ -71,7 +71,7 @@ def save_training_curves_v5(
     plt.plot(hist["loss"], linewidth=2, label="Train Loss")
     if "val_loss" in hist.columns:
         plt.plot(hist["val_loss"], linewidth=2, label="Validation Loss")
-    plt.title("Training vs Validation Loss")
+    # Judul figure dihapus: caption ditulis di dokumen Word.
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
     plt.grid(True, alpha=0.3)
@@ -91,7 +91,7 @@ def save_training_curves_v5(
     ]:
         if col in hist.columns:
             plt.plot(hist[col], linewidth=2, label=label)
-    plt.title("Training vs Validation Precision / Recall / F1")
+    # Judul figure dihapus: caption ditulis di dokumen Word.
     plt.xlabel("Epoch")
     plt.ylabel("Score")
     plt.grid(True, alpha=0.3)
@@ -191,7 +191,7 @@ def plot_roc_pr_v5(
         plt.plot(fpr_v, tpr_v, linewidth=2, label=f"Validation ROC-AUC = {auc_v:.4f}")
         plt.plot(fpr_h, tpr_h, linewidth=2, label=f"Frozen Holdout ROC-AUC = {auc_h:.4f}")
         plt.plot([0, 1], [0, 1], linestyle="--", linewidth=1, label="Random")
-        plt.title("ROC Curve — Validation vs Frozen Holdout")
+        # Judul figure dihapus: caption ditulis di dokumen Word.
         plt.xlabel("False Positive Rate")
         plt.ylabel("True Positive Rate")
         plt.grid(True, alpha=0.3)
@@ -207,7 +207,7 @@ def plot_roc_pr_v5(
         plt.figure(figsize=(8, 6), dpi=120)
         plt.plot(r_v, p_v, linewidth=2, label=f"Validation AP = {ap_v:.4f}")
         plt.plot(r_h, p_h, linewidth=2, label=f"Frozen Holdout AP = {ap_h:.4f}")
-        plt.title("Precision-Recall Curve — Validation vs Frozen Holdout")
+        # Judul figure dihapus: caption ditulis di dokumen Word.
         plt.xlabel("Recall")
         plt.ylabel("Precision")
         plt.grid(True, alpha=0.3)
@@ -252,7 +252,7 @@ def plot_confusion_v5(
         plt.xticks([0, 1], ["safe", "unsafe"])
         plt.yticks([0, 1], ["safe", "unsafe"])
         plt.colorbar()
-    plt.title(f"Confusion Matrix — {name}")
+    # Judul figure dihapus: caption ditulis di dokumen Word.
     plt.xlabel("Predicted")
     plt.ylabel("Actual")
     plt.tight_layout()
@@ -305,3 +305,52 @@ def write_experiment_manifest(
     with open(path, "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2, ensure_ascii=False)
     return path
+
+
+def bootstrap_ci_metrics(
+    y_true: np.ndarray,
+    y_prob: np.ndarray,
+    threshold: float = 0.50,
+    n_bootstrap: int = 2000,
+    seed: int = 42,
+    ci: float = 0.95,
+) -> pd.DataFrame:
+    """Interval kepercayaan bootstrap untuk metrik biner (laporan skripsi).
+
+    Stratified resampling (pertahankan proporsi kelas) agar stabil
+    pada split kecil. Tanpa TF.
+    """
+    from sklearn.metrics import (
+        accuracy_score,
+        f1_score,
+        precision_score,
+        recall_score,
+        roc_auc_score,
+    )
+
+    y_true = np.asarray(y_true).astype(int)
+    y_prob = np.asarray(y_prob).astype(float)
+    rng = np.random.RandomState(seed)
+    idx0 = np.where(y_true == 0)[0]
+    idx1 = np.where(y_true == 1)[0]
+    alpha = 1.0 - ci
+    stats: dict[str, list[float]] = {
+        "accuracy": [], "precision": [], "recall": [], "f1": [], "roc_auc": [],
+    }
+    for _ in range(n_bootstrap):
+        s0 = rng.choice(idx0, size=len(idx0), replace=True) if len(idx0) else np.array([], dtype=int)
+        s1 = rng.choice(idx1, size=len(idx1), replace=True) if len(idx1) else np.array([], dtype=int)
+        ii = np.concatenate([s0, s1])
+        yt, yp = y_true[ii], y_prob[ii]
+        pred = (yp >= threshold).astype(int)
+        stats["accuracy"].append(float(accuracy_score(yt, pred)))
+        stats["precision"].append(float(precision_score(yt, pred, zero_division=0)))
+        stats["recall"].append(float(recall_score(yt, pred, zero_division=0)))
+        stats["f1"].append(float(f1_score(yt, pred, zero_division=0)))
+        stats["roc_auc"].append(float(roc_auc_score(yt, yp)))
+    rows = []
+    for metric, vals in stats.items():
+        lo, hi = float(np.percentile(vals, 100 * alpha / 2)), float(np.percentile(vals, 100 * (1 - alpha / 2)))
+        rows.append({"metric": metric, "mean": float(np.mean(vals)), "lo": lo, "hi": hi,
+                     "ci": ci, "n_bootstrap": n_bootstrap})
+    return pd.DataFrame(rows)

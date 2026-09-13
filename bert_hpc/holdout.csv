@@ -1,0 +1,82 @@
+nama produk,text,label,label_id,gold_label,group_key
+alba cheese,"susu, garam, rennet dari yeast kluyveromyces lactis kultur starter (streptococcus thermophilus, lactobacillus delbrueckki subsp bulgaricus. Mengandung alergen",unsafe,1,unsafe,alba cheese
+almond cookies,"Tepung Terigu, Gula Kristal, Air, Kacang Almond (8%), Mentega Tawar,
+Mentega, Garam, Susu Evaporasi.",unsafe,1,unsafe,almond cookies
+anchor cheese,"Susu (75%) dan Krim
+Pasteurisasi, Garam, Penstabil (Gom
+Guar, Gom Kacang Lokus) dan Kultur
+Bakteri Starter. Mengandung
+alergen: susu. Simpan pada suhu
+2-4? dan tidak beku.",unsafe,1,unsafe,anchor cheese
+astor chocolate,"Gula, Tepung Terigu, Minyak Nabati (Minyak Kelapa dan Minyak Sawit (mengandung Antioksidan BHA)), Susu Bubuk, Kakao Bubuk, Tepung Tapioka, Kacang Mede, Maltodekstrin, Pengemulsi (Lesitin Kedelai), Pewarna Alami Karamel IV (E150d), Garam, Perisai Sintetik, Pengembang. Mengandung alergen lihat daftar yang dicetak tebal.",unsafe,1,unsafe,astor chocolate
+bakso ikan bernardi,"Daging Ikan (69%), AIR, Pati Tapiola Termodifikasi, Garam, Pengemulsi, Fosfat, Pengawet Kalium Sorbat, Antioksidan Natrium Ebitorbat. Mengandung Alergen, Lihat daftar bahan yang dicetak tebal. Diproduksi menggunakan peralatan yang juga memproses kedelai, crustacea, wijen, telur, susu & gandum.",unsafe,1,unsafe,bakso ikan bernardi
+bakso sapi karawaci,"Daging Sapi (70%), Es Batu, Tepung Tapioka (Mengandung Pengawet Sulfit), Garam, Penguat Rasa Mononatrium Glutamat, Lada Putih, Bawang Putih, Penstabil Fosfat, Pengawet Kalium Sorbat.",safe,0,safe,bakso sapi karawaci
+basreng super,"Ikan Segar, Tapioka, Garam, Bawang Merah, Bawang Putih",safe,0,safe,basreng super
+beng beng maxx,"Glukosa, Lemak Nabati (mengandung Antioksidan BHA), Gula, Tepung Terigu, Susu Bubuk, Maltodekstrin,
+Krispi Beras, Kakao Massa, Lemak Kakao, Lemak Susu, Pemanis Alami Sorbitol, Krimer Nabati, Pengemulsi (Lesitin Kedelai), Garam, Pengembang, Pensa Sintetik. Mengandung alergen, Iihat pada daftar bahan yang dicetak tebal. Konsumsi berlebihan dapat mempunyai efek laksatif.",unsafe,1,unsafe,beng beng maxx
+bihunku rasa ayam bawang,"Bihun : Pati Jagung, Beras, Pati Tapioka, Pengemulsi Nabati, Pengental Nabati, Penstabil Fosfat. Bumbu : Garam, Gula, Bumbu Ayam Bawang (Mengandung Penguat Rasa Mononatrium Glutamat, Dinatrium 5-ribonukleotida, Hidrolisat
+Protein Nabati, Antioksidan Tokoferol, Askorbil Palmitat, dan Asam Askorbat), Penguat Rasa (Mononatrium Glutamat. Dinatrium Inosinat dan Guanilat), Ayam Bubuk, Bawang Merah Bubuk, Bawang Putih Bubuk. Daun Bawang Kering, Lada Bubuk, Daun Seledri Kering. Minyak Bumbu : Minyak Nabati, Bumbu Bawang, Antioksidan TBHQ.
+Cabe Bubuk",unsafe,1,unsafe,bihunku rasa ayam bawang
+bihunku rasa soto,"Bihun : Pati Jagung, Beras, Pati Tapioka, Pengemulsi Nabati, Pengental Nabati, Penstabil Fosfat.
+Bumbu : Garam, Gula, Bumbu Rasa Soto (Mengandung Hidrolisat Protein Nabati, Antioksidan Tokoferol), Penguat Rasa (Mononatrium Glutamat, Dinatrium Inosinat dan Guanilat), Ayam Bubuk. Bawang Putih Bubuk. Bawang Merah Bubuk, Daun Bawang Kering, Lada Bubuk, Daun Seledri Kering.
+Minyak Bumbu : Minyak Nabati, Bumbu, Antioksidan TBHQ.
+Cabe Bubuk",safe,0,safe,bihunku rasa soto
+biokul greek yoghurt,"Air, Konsentrat Susu, Buttermilk Bubuk,  Krim Susu. Pati Modifikasi, Penstabil (Nabati, Gelatin Sapi), Kultur Yogurt (S. thermophilus, L. bulgaricus,
+L. acidophilus, Bifidobacterium). ",unsafe,1,unsafe,biokul greek yoghurt
+biokul yoghurt bluberi,"Yogurt (95.75%) (Mengandung Susu (26.35%). Kultur Bakteri (S. thermophilus. L. bulgaricus. L. acidophilus, Bifidobacterium)). Buah
+Blueberi (1.95%). Gula, Air, Perisa Sintetik, Penstabil Nabati dan Hewani, Pengatur Keasaman (Asam Sitrat), Penstabil Nabati.",unsafe,1,unsafe,biokul yoghurt bluberi
+biokul yoghurt jeruk,"Yogurt (80%) (Mengandung Susu (26,35%). Kultur Bakteri (S. thermophilus. L. bulgaricus. L. acidophilus, Bifidobacterium)). Aprikot Olahan (10%) (Mengandung Potongan Aprikot (18%)), Air, Gula, Potongan Persik (1%), Perisa Sintetik. Penstabil Nabati. ",unsafe,1,unsafe,biokul yoghurt jeruk
+biokul yoghurt ori,"Air, Susu Sapi (25%), Susu Skim Bubuk. Konsentrat Susu, Gula, Buah Blueberi (3.5%), Pati modifikasi, Penstabil (Nabati, Gelatin Sapi). Perisa Sintetik Blueberi, Pengatur Keasaman
+Asam Sitrat, Kultur Yogurt (S. thermophilus, L. bulgaricus,
+L. acidophilus. Bifidobacterium).",unsafe,1,unsafe,biokul yoghurt ori
+biokul yoghurt stroberi,"Yogurt (90,90%) (Mengandung Susu (26,35%). Kultur Bakteri (S. thermophilus. L. bulgaricus. L. acidophilus, Bifidobacterium)). Air, Buah Stroberi (3,24%), Gula, Pengatur Keasaman Asam Sitrat, Penstabil Nabati, Perisa Sintetik Stroberi, Pewarna Sintetik (Karmoisin CI No. 14720)",unsafe,1,unsafe,biokul yoghurt stroberi
+biskuit lapis cokelat binch,"Cokelat 59%. (mengandung susu. kacang almond, kacang tanah), tepung gandum, temak reroti (mengandung antioksidan tokoferol). susu bubuk,  sirup gula invert, mentega penqembang amonium hidrogen karbonat dan natrium hidrogen karbonat, garam, whey protein. pengemulsi lesitin kedelai, campuran ragi, perisa sintetik. pengatur keasaman asam sitrat, bahan penolong enzim protease.
+Menqandunq alergen, lihat daftar yang dicetak tebat.",unsafe,1,unsafe,biskuit lapis cokelat binch
+blastoz bites,"Gula, Pengganti Lemak Kakao, Tepung Terigu, Maltodekstrin, Sirup Glukosa, Krispi Beras (7%), Whey Bubuk, Lemak Reroti Nabati (Mengandung Antioksidan Askorbil Palmitat & Tokoferol), Kakao Bubuk (4.3%), Kalsium Karbonat, Sirup
+Fruktosa, Dekstrosa, Susu Bubuk Full Cream, Humektan (Gliserin), Krimer
+(Mengandung Kasein & Pewarna Alami Beta-Karoten (Sintetik) CI. No. 40800),
+Pengemulsi Lesitin Kedelai, Garam, Minyak Nabati (Mengandung Antioksidan TBHQ), Ekstrak Malt, Perisa Sintetik, Kakao Massa (0.11%),  Pewama Alami Karamel Kelas IV, Pengental Nabati. Mengandung alergen, lihat daftar bahan yang dicetak tebal.",unsafe,1,unsafe,blastoz bites
+boncabe makaroni krispi level 15,"Makaroni. Bumbu Pedas Level 15 (Cabai Bubuk, Bawang Merah Goreng, Garam, Gula Kastor, Mononatrium Glutamat,  Minyak Nabati, Bawang Putih Bubuk, Bawang Bombai Bubuk, Dinatrium 5'-
+Inosinat, Dinatrium 5'-Guanilat, Ekstrak Ragi), Minyak Nabati.
+Alergen Mengandung alergen, lihat daftar bahan yang dicetak tebal. Diproduksi menggunakan peralatan yang juga memproses : Susu, Seledri, Kacana Kedelai, Ikan, Krustasea.",safe,0,safe,boncabe makaroni krispi level 15
+bourbon botter cookies,"Tepung Gandum (48%), Gula Pasir, Lemak Reroti, Margarin (mengandung susu), Mentega (3%) (mengandung
+susu sapi), Kelapa, Telur, Susu Skim, Garam, Perisa Alami, Pengembang Natrium Hidrogen karbonat, Minyak Nabati, Pengemulsi Lesitin Kedelai, Pemrna Alami Beta-Karoten (Sintetik) Cl No.40800 ""Mengandung alergen, Lihat daftar bahan yang dicetak tebal""",unsafe,1,unsafe,bourbon botter cookies
+bourbon choco&coffee biscuits,"Tepung Gandum (47.36%), Gula Pasir, Lemak Reroti, Minyak Nabati, Susu Bubuk, Lembaga Gandum (1.89%), Kakao bubuk (1.16%), Pengembang Natrium Hidrogen Karbonat, Ekstrak Malt, Glukosa, Garam, Kopi (0.5611%), Kakao massa, Whey Bubuk, Pengemulsi Lesitin Kedelai, Pewarna Alami Ekstrak Anato CI No. 75210, Perisa Alami  ""Mengandung alergen, Lihat daftar bahan yang dicetak tebal""",unsafe,1,unsafe,bourbon choco coffee biscuits
+brook farm chocolate milk,"Susu Sapi Segar (92,60%), Gula, Susu Sapi Skim Segar (3%), Cokelat Bubuk (1%), Penstabil Nabati TANPA PEWARNA SINTETIK DAN
+PENGAWET",unsafe,1,unsafe,brook farm chocolate milk
+brook farm fresh milk,Susu Sapi Segar (100%) TANPA PEWARNA SINTETIK DAN PENGAWET,unsafe,1,unsafe,brook farm fresh milk
+brook farm low-fat milk,"Susu Sapi Segar (40%), Air, Susu Skim Segar (20%) TANPA PEWARNA SINTETIK DAN PENGAWET",unsafe,1,unsafe,brook farm low fat milk
+brook farm strawberry milk,"Susu Sapi Segar (94,67%), Gula, Sirup Stroberi (2,5%) (Mengandung Jus Stroberi (24%)), Penstabil Nabati, Perisa Sintetik, Pewarna Merah Allura CI No. 16035 TANPA PENGAWET",unsafe,1,unsafe,brook farm strawberry milk
+bumbu sup udon higashimaru udon soup,"Usukuchi kecap bubuk, garam, gula, dekstrosa, protein kedelai, daun bawang, ikan bonito bubuk, kelp, penguat rasa mononatrium glutamat, pewama alami karamel IV. Mengandung alergen,
+lihat daftar bahan yan dicetak tebal",unsafe,1,unsafe,bumbu sup udon higashimaru udon soup
+bumifood ebi furai,"Udang 50%, Tepung Roti (Mengandung Tepung Terigu, Antioksidan Asam Askorbat, Perisa Alami Paprika), Tepung Batter (Mengandung Gandum, Penguat Rasa Mononatrium Glutamat), Tepung Terigu, Bumbu, Garam, Gula, Penguat Rasa Mononatrium Glutamat.",unsafe,1,unsafe,bumifood ebi furai
+bumifood seafood platter,"Ikan Patin (22.8%), Tepung Roti (Mengandung Terigu), Air, Tepung Batter, Udang (11.67%) Cumi-Cumi (7.5%), Bawang Bombay (6.76%), Penguat Rasa Mononatrium Glutamat, Garam, Gula, Bawang Putih Bubuk, Lada.",unsafe,1,unsafe,bumifood seafood platter
+"bumifood shrimp, squid & fish mini wonton","kulit lumpia (mengandung terigu), udang (13%), cumi-cumi (13%), surimi (daging ikan) (12%), soun, air, tepung tapioka, minyak kelapa sawit, garam, bumbu (mengandung penguat rasa mononatrium glutamat), gula (mengandung pengawet sulfit < 0.05 ppm), minyak wijen, bawang daun (0,9%), penguat rasa mononatrium glutamat, pengemulsi dinatrium difosfat.",unsafe,1,unsafe,bumifood shrimp squid fish mini wonton
+butter cookies,"Tepung Terigu, Mentega (24.27%), Gula, Telur, Kelapa Parut, Pengembang
+(Amonium Bikarbonat dan
+Natrium Bikarbonat), Sirup Glukosa, Garam, Kismis, Perisa Sintetik Vanila. ""Mengandung Alergen, Lihat daftar bahan yang dicetak tebal""",unsafe,1,unsafe,butter cookies
+dailymeal nasi jagung,"Tepung Jagung (65,8%), Singkong (31,2%), Air, Minyak Kelapa Sawit, Pengemulsi (Fosfat, Nabati)",safe,0,safe,dailymeal nasi jagung
+dailymeal nasi singkong,"Singkong (64.92%). Tepung Jagung, Tepung Maizena. Minyak Kelapa Sawit, Air, Pengemulsi",safe,0,safe,dailymeal nasi singkong
+dark chocolate cookies,"Tepung Gandum Utuh, Tepung Beras Putih, Coklat Cair, Coklat Bubuk, Krimer Nabati, Gula, Lemak Coklat,
+dan Garam.",safe,0,safe,dark chocolate cookies
+fukumi beras porang,"Tepung porang (48%), tepung beras, air",safe,0,safe,fukumi beras porang
+kemplang ikan koin,"Ikan Tenggiri, Sagu, Garam, Minyak Nabati",safe,0,safe,kemplang ikan koin
+kemplang udang,"Udang, Sagu, Garam, Minyak Nabati",safe,0,safe,kemplang udang
+kentang home,"Kentang, Minyak Kelapa Sawit (Mengandung Antioksidan Tokoferol), Dekstrosa",safe,0,safe,kentang home
+keripik singkong karuhun,"keripik singkong pilihan, daun jeruk, garam, cabai, minyak goreng, rempah, bawang putih.",safe,0,safe,keripik singkong karuhun
+keripik ubi ungu,"Singkong Pilihan, Minyak Nabati, Garam, Gula Pasir",safe,0,safe,keripik ubi ungu
+kerupuk balado pedas,"Ikan Tenggiri, Sagu, Garam, Minyak Nabati, Cabe Merah, Bawang Merah",safe,0,safe,kerupuk balado pedas
+kerupuk pilus,"Ikan Tenggiri, Sagu Garam, Minyak Goreng.",safe,0,safe,kerupuk pilus
+kingsfisher kornet tuna,"Ikan Tuna/Tuna Fish (70%), Air/Water,
+Kaldu Nabati/Vegetable Broth, Garam/Salt (0.7%), Penguat Rasa (Mononatrium Glutamat) / Flavor Enhancer (Monosodium Glutamate),",safe,0,safe,kingsfisher kornet tuna
+mayonais,"Minyak Kedelai (Mengandung Antioksidan Askorbil Palmitat), Air, Kuning Telur Gula (Mengandung Pengawet Sulfit), Garam, Pengatur Keasaman (Asam Asetat dan Asam Laktat), Penguat Rasa Mononatrium Glutamat, Pengental Gom Xanthan, Minyak Mustard, Sekuestran Kalsium Dinatrium EDTA, Perisa Alami Paprika.",safe,0,safe,mayonais
+my jelly,"Air, Gula (19.5%), Nata De Coco (7.14%), Jeli Bubuk, Pengatur Keasaman (Asam sitrat), Perisa Sintetik (Stroberi, Lea, Melon), Tepung Konyaku, Pewarna Sintetik (Tartrazin CI 19140, Merah Allura CI 16035, Biru berlian FCF CI 42090). Tanpa Pengawet dan Tanpa Pemanis Buatan. Diproduksi menggunakan peralatan yang juga memproses susu.",safe,0,safe,my jelly
+nata de coco,"Sari Kelapa (50%), Air, Gula, Perisa
+Sintetik Cocopandan, Pengatur Keasaman (Asam Sitrat), Pengawet Natrium Benzoat, Madu (0.01 %).
+Tanpa Pemanis Buatan.",safe,0,safe,nata de coco
+poco loco salted tortilla chips,"Jagung, Minyak Nabati, Garam(1%)",safe,0,safe,poco loco salted tortilla chips
+qtela singkong ori,"Singkong (63.5%), Minyak Olein Kelapa Sawit, Bumbu (mengandung Gula, Penguat Rasa Mononatrium Glutamat, Bubuk Bawang Putih, Bubuk Bawang Bombay, Penguat Rasa Dinatrium Guanilat dan Dinatrium Inosinat), Garam (0.63%).",safe,0,safe,qtela singkong ori
+rumput laut mama suka,"Rumput Laut (47%), Minyak Jagung, Garam Gurih (5%) (mengandung Penguat Rasa Mononatrium Glutamat, Dinatrium Inosinat dan Guanilat), Minyak Zaitun (4%), Minyak Wijen.",safe,0,safe,rumput laut mama suka
+sardines abc ekstra pedas,"Ikan Sarden (51%), saus cabai (mengandung penguat rasa mononatrium glutamat) (41%), gula, bawang putih, bawang bombay, garam, cabai rawit (1%)",safe,0,safe,sardines abc ekstra pedas
+Bakso sapi Karawaci,"Kandungan: Daging sapi (70%), es batu, tepung tapioka (mengandung pengawet sulfit), garam, penyedap rasa mononatrium glutamat, merica putih, bawang putih, bahan penstabil fosfat, pengawet kalium sorbat.",safe,0,safe,bakso sapi karawaci
+Bakso Sapi Karawaci,"Bahan-bahan: Olahan daging sapi (70%), air beku, pati singkong (dengan tambahan pengawet sulfit), garam dapur, penambah cita rasa mononatrium glutamat, bubuk lada putih, umbi bawang putih, zat penstabil fosfat, bahan pengawet kalium sorbat.",safe,0,safe,bakso sapi karawaci

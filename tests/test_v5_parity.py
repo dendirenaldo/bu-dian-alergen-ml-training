@@ -187,10 +187,15 @@ def test_config_v5_defaults_sesuai_notebook():
 
     c = Config()
     assert c.mode == "legacy"  # default aman; parity via --mode/TRAIN_MODE
-    assert c.v5.holdout_size == 23
-    assert (c.v5.holdout_safe, c.v5.holdout_unsafe) == (2, 21)
-    assert (c.v5.val_safe, c.v5.val_unsafe) == (2, 16)
+    # Default = konfigurasi FINAL terbaik (Fase 2-4), bukan angka notebook:
+    # split 50 (25/25), LR 1e-4 (D2), clip 1.0 (D1), mask (D3).
+    assert c.v5.holdout_size == 50
+    assert (c.v5.holdout_safe, c.v5.holdout_unsafe) == (25, 25)
+    assert (c.v5.val_safe, c.v5.val_unsafe) == (25, 25)
     assert c.v5.synthetic_total == 1000
     assert c.v5.fixed_threshold == 0.50
+    assert c.v5.learning_rate == 1e-4
+    assert c.v5.gradient_clip_norm == 1.0
+    assert c.v5.mask_zero is True
     assert c.v5.embed_trainable is True
     assert c.v5.train_shuffle is False

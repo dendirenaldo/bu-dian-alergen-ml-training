@@ -1,4 +1,0 @@
-split,total_tokens,unk_tokens,unk_rate
-final_train,33998,0,0.0
-validation,748,30,0.040106951871657755
-frozen_holdout,824,40,0.04854368932038835
