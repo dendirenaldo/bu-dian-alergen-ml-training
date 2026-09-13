@@ -1,7 +1,40 @@
 # Training BERT di HPC — Kontrak Perbandingan Apel-vs-apel
 
 Model BiLSTM final sudah dikunci lokal (`models_final/`, metrik `output_final/`).
-BERT dilatih di HPC dengan **data split yang byte-identik**.
+BERT dilatih di HPC dengan **data split yang byte-identik**, memakai skrip
+siap-pakai `bert_hpc/train_bert_hpc.py` (standalone: hanya butuh
+`torch`, `transformers`, `scikit-learn`, `pandas`, `numpy`, `accelerate`).
+
+## 0. Ringkasan langkah di HPC (copy-paste)
+
+```bash
+# 1. Upload direktori bert_hpc/ dari repo lokal ke HPC, lalu masuk ke sana
+cd bert_hpc
+
+# 2. Siapkan environment (GPU node, Python >=3.10)
+python3 -m venv venv && source venv/bin/activate
+pip install --upgrade pip
+pip install torch transformers scikit-learn pandas numpy accelerate
+
+# 3. Verifikasi identitas split (WAJIB, cocokkan dengan split_contract.json)
+sha256sum train_combined.csv train_real.csv val.csv holdout.csv synthetic.csv
+
+# 4. (Opsional, bila HF Hub diblokir) unduh model di login node dulu, lalu:
+# export HF_HUB_OFFLINE=1 HF_HOME=/path/cache
+
+# 5. Fine-tuning utama (IndoBERT, pool sama dengan BiLSTM).
+#    Cukup 1x GPU 16GB (batch 16, max_len 256). Estimasi ±10-20 menit.
+python train_bert_hpc.py --data-dir . --output-dir ./bert_hpc_results
+
+# 6. Hasil VAL + HOLDOUT @threshold 0.5 tercetak otomatis di akhir.
+#    Simpan/copy output terminal ini ke laporan.
+
+# 7. Ablasi opsional (tanpa synthetic — menjawab "synthetic membantu?")
+python train_bert_hpc.py --data-dir . --output-dir ./bert_hpc_results_realonly \
+    --train-file train_real.csv
+
+# 8. Bawa pulang SELURUH direktori bert_hpc_results*/
+```
 
 ## 1. File yang dibawa ke HPC
 
@@ -19,17 +52,19 @@ Dari `bu-dian-alergen-ml-training/bert_hpc/` (dibuat oleh `scripts/rebuild_split
 Verifikasi pertama di HPC: regenerate dengan skrip yang sama lalu
 `diff split_contract.json` — sha256 harus sama persis.
 
-## 2. Rekomendasi training (IndoBERT)
+## 2. Yang dilakukan skrip (cukup pakai argumen, tidak perlu edit kode)
 
-- Checkpoint: `indobenchmark/indobert-base-p1` (pluggable, catat ID persis).
-- Input: kolom `text` apa adanya (jangan lower-case agresif / buang stopwords;
-  biarkan subword tokenizer bawaan).
-- Pool utama: `train_combined.csv` (rekomendasi; banding adil vs BiLSTM).
-  Opsional: ulangi dengan `train_real.csv` sebagai ablasi synthetic.
-- Validasi: `val.csv` untuk early-stop. Seed 42.
-- Threshold: **fixed 0.5** untuk tabel utama (sama seperti BiLSTM).
-  Threshold hasil tuning-val boleh dilaporkan sebagai kolom sekunder, tidak
-  dipakai untuk klaim utama.
+- Checkpoint default `indobenchmark/indobert-base-p1` (ganti via `--model-name`;
+  ID persis tercatat otomatis di `model_card.json`).
+- Teks dipakai apa adanya; tokenisasi subword bawaan HF (`--max-len 256`).
+- Default: `--epochs 4 --lr 2e-5 --batch-size 16`, `weight_decay=0.01`,
+  `warmup_ratio=0.1`, seed 42.
+- Early stopping (`--patience 2`, monitor `eval_loss`) + best-model-restore —
+  semuanya dari **val saja**. Holdout hanya diprediksi sekali di akhir.
+- Metrik utama threshold **fixed 0.5** (sama seperti BiLSTM).
+
+Jika job antre/lama: turunkan `--batch-size 8` dan/atau `--max-len 128`,
+lalu catat perubahan di laporan (hasil tidak lagi identik dengan default).
 
 ## 3. Artefak yang wajib dibawa pulang
 
