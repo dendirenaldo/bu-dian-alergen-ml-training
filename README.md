@@ -1,17 +1,19 @@
 # Bu Dian ML Training
 
-Pipeline training model untuk deteksi alergen makanan. Menggunakan Word2Vec + BiLSTM/LSTM dengan hyperparameter tuning dan evaluasi komprehensif.
+Pipeline training model untuk deteksi alergen makanan. Dual-model: Word2Vec + BiLSTM/LSTM dan BERT (HuggingFace PyTorch, pluggable checkpoint) dengan hyperparameter tuning dan evaluasi komprehensif.
 
 ## Tech Stack
 
 - Python 3.11
-- TensorFlow 2.17 (deep learning)
+- TensorFlow 2.17 (BiLSTM/LSTM)
+- PyTorch + Transformers + Datasets + Accelerate (BERT)
 - Gensim 4.3 (Word2Vec embeddings)
-- Sastrawi 1.0 (Indonesian NLP - stopword removal)
+- Sastrawi 1.0 (Indonesian NLP - stopword removal, hanya BiLSTM)
 - OpenCV 4.11 (image preprocessing)
 - Tesseract OCR via Pytesseract
 - Scikit-learn (metrics, preprocessing)
 - Click (CLI framework)
+- Pytest (testing)
 
 ## Setup
 
@@ -90,16 +92,58 @@ python scripts/train.py -v train
 | `--epochs` | Jumlah epochs | 150 |
 | `--batch-size` | Batch size | 64 |
 | `--seed` | Random seed | 42 |
+| `--model` | Model: `bilstm`, `lstm`, `bert`, `all` | `all` |
+| `--bert-model` | Checkpoint HF (pluggable, mis. `indobenchmark/indobert-base-p1`) | dari .env |
+| `--bert-epochs` | Epoch training BERT | 4 |
+| `--bert-lr` | Learning rate BERT | 2e-5 |
+
+### Training BERT
+
+```bash
+# BERT saja (default IndoBERT, bisa diganti varian lain tanpa ubah kode)
+python scripts/train.py train --model bert
+
+# Coba varian BERT lain
+python scripts/train.py train --model bert --bert-model bert-base-multilingual-cased
+python scripts/train.py train --model bert --bert-model xlm-roberta-base --bert-epochs 3
+
+# Semua model (BiLSTM + LSTM + BERT) di split test yang sama
+python scripts/train.py train --model all
+```
+
+> Catatan: BERT memakai teks mentah + normalisasi ringan (tanpa stopword
+> removal) karena WordPiece butuh konteks. BiLSTM tetap memakai
+> `cleanse → tokenize → filter`.
 
 ### Evaluasi
 
 ```bash
-# Bandingkan model BiLSTM dan LSTM
+# Bandingkan model BiLSTM dan LSTM (pakai artefak training, anti-leakage)
 python scripts/evaluate.py compare \
     --model-bilstm ./models/bilstm_word2vec.keras \
     --model-lstm ./models/lstm_word2vec.keras \
     --csv-input ./ocr_output/data-mengandung.csv \
+    --model-dir ./models \
     --output-dir ./output
+
+# Sertakan BERT dalam perbandingan
+python scripts/evaluate.py compare \
+    --model-bilstm ./models/bilstm_word2vec.keras \
+    --model-lstm ./models/lstm_word2vec.keras \
+    --model-bert ./models/bert \
+    --csv-input ./ocr_output/data-mengandung.csv \
+    --model-dir ./models \
+    --output-dir ./output
+```
+
+> `--model-dir` wajib agar evaluasi me-load `tokenizer.pkl`,
+> `label_encoder.pkl`, `splits.json`, dan `thresholds.json` dari training
+> (bukan fit ulang yang menyebabkan leakage + mismatch vocab).
+
+### Testing
+
+```bash
+pytest tests/ -v
 ```
 
 ### Sebagai Python Module
@@ -146,6 +190,19 @@ Setelah training, file berikut dihasilkan:
 
 - `models/bilstm_word2vec.keras` — Model BiLSTM
 - `models/lstm_word2vec.keras` — Model LSTM
+- `models/bilstm_model.keras` — Alias BiLSTM untuk ML service
+- `models/bert/` — Model + tokenizer BERT (format HuggingFace)
+- `models/tokenizer.pkl` + `models/tokenizer_bilstm.json` — Tokenizer
+- `models/label_encoder.pkl` + `models/label_map.json` — Label map
+- `models/thresholds.json` — Threshold per model (hasil tuning-val)
+- `models/metadata.json` — Identitas artefak (git sha, metrik, label map)
+
+### Metrik & Laporan
+
+- `output/splits.json` — Indeks train/test (dipakai ulang semua model)
+- `output/thresholds.json` — Threshold per model
+- `output/bert_metrics.json` — Metrik BERT
+- `output/comparison_models.csv` — Perbandingan semua model (nama lama `comparison_bilstm_vs_lstm.csv` tetap ditulis)
 
 ### Metrik & Laporan
 
@@ -175,7 +232,7 @@ Setelah training, file berikut dihasilkan:
 ```
 ml-training/
 ├── app/
-│   ├── config.py                    # Konfigurasi sentral
+│   ├── config.py                    # Konfigurasi sentral (+ BertConfig, model_type)
 │   ├── core/
 │   │   ├── preprocessing/           # Preprocessing gambar & teks
 │   │   │   ├── image.py
@@ -188,15 +245,22 @@ ml-training/
 │   │   │   └── word2vec.py          # Word2Vec training & embedding
 │   │   └── model/
 │   │       ├── architecture.py      # LSTM/BiLSTM model builder
-│   │       ├── tokenizer.py         # Keras tokenizer wrapper
-│   │       ├── tuner.py             # Hyperparameter tuning
-│   │       └── evaluator.py         # Metrik & plot evaluasi
+│   │       ├── tokenizer.py         # Keras tokenizer wrapper (+ JSON)
+│   │       ├── tuner.py             # Hyperparameter tuning (stratified)
+│   │       ├── evaluator.py         # Metrik & plot evaluasi (+ threshold)
+│   │       ├── protocols.py         # Abstraksi Tokenizer/ClassifierBase
+│   │       ├── model_factory.py     # Factory BiLSTM/LSTM/BERT
+│   │       └── bert/                # Modul BERT (pluggable checkpoint)
+│   │           ├── dataset.py       # Normalisasi ringan (tanpa stopword)
+│   │           ├── trainer_bert.py  # HF Trainer + threshold-tuning
+│   │           └── evaluate_bert.py # Evaluasi direktori model BERT
 │   └── training/
-│       └── trainer.py               # Training orchestrator
+│       └── trainer.py               # Training orchestrator (dual-model)
 ├── scripts/
-│   ├── train.py                     # CLI training
-│   └── evaluate.py                  # CLI evaluasi
+│   ├── train.py                     # CLI training (--model, --bert-model)
+│   └── evaluate.py                  # CLI evaluasi (--model-dir, --model-bert)
 ├── tests/
+│   └── test_dual_model.py           # Regression tests
 ├── requirements.txt
 └── .env.example
 ```

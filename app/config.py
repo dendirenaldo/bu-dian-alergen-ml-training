@@ -10,6 +10,45 @@ load_dotenv()
 
 
 @dataclass
+class BertConfig:
+    """Konfigurasi khusus BERT (pluggable via model_name)."""
+
+    model_name: str = field(
+        default_factory=lambda: os.getenv(
+            "BERT_MODEL_NAME", "indobenchmark/indobert-base-p1"
+        )
+    )
+    max_len: int = field(
+        default_factory=lambda: int(os.getenv("BERT_MAX_LEN", "256"))
+    )
+    learning_rate: float = field(
+        default_factory=lambda: float(os.getenv("BERT_LR", "2e-5"))
+    )
+    epochs: int = field(default_factory=lambda: int(os.getenv("BERT_EPOCHS", "4")))
+    batch_size: int = field(
+        default_factory=lambda: int(os.getenv("BERT_BATCH_SIZE", "16"))
+    )
+    weight_decay: float = field(
+        default_factory=lambda: float(os.getenv("BERT_WEIGHT_DECAY", "0.01"))
+    )
+    warmup_ratio: float = field(
+        default_factory=lambda: float(os.getenv("BERT_WARMUP_RATIO", "0.1"))
+    )
+    freeze_layers: int = field(
+        default_factory=lambda: int(os.getenv("BERT_FREEZE_LAYERS", "0"))
+    )
+    dropout: float = field(
+        default_factory=lambda: float(os.getenv("BERT_DROPOUT", "0.1"))
+    )
+    # Ruang pencarian tuning BERT (kecil, karena mahal).
+    lr_options: list = field(default_factory=lambda: [2e-5, 3e-5, 5e-5])
+    batch_size_options: list = field(default_factory=lambda: [8, 16])
+    num_trials: int = field(
+        default_factory=lambda: int(os.getenv("BERT_NUM_TRIALS", "3"))
+    )
+
+
+@dataclass
 class Config:
     """Central configuration extracted from the notebook's PANEL KONFIGURASI UTAMA."""
 
@@ -20,14 +59,27 @@ class Config:
     csv_input: str = field(default_factory=lambda: os.getenv("CSV_INPUT", "./ocr_output/data-mengandung.csv"))
 
     # --- Data source ---
-    data_source_mode: str = "CSV"  # 'OCR' or 'CSV'
-    text_col: str = "text"
-    label_col: str = "label"
-    seed: int = int(os.getenv("SEED", "42"))
+    data_source_mode: str = field(
+        default_factory=lambda: os.getenv("DATA_SOURCE_MODE", "CSV")
+    )
+    text_col: str = field(default_factory=lambda: os.getenv("TEXT_COL", "text"))
+    label_col: str = field(default_factory=lambda: os.getenv("LABEL_COL", "label"))
+    seed: int = field(default_factory=lambda: int(os.getenv("SEED", "42")))
+    csv_delimiter: str = field(
+        default_factory=lambda: os.getenv("CSV_DELIMITER", ";")
+    )
+    csv_encoding: str = field(
+        default_factory=lambda: os.getenv("CSV_ENCODING", "utf-8")
+    )
 
     # --- Data ---
-    test_size: float = 0.2
-    max_len: int = 120
+    test_size: float = field(
+        default_factory=lambda: float(os.getenv("TEST_SIZE", "0.2"))
+    )
+    val_size: float = field(
+        default_factory=lambda: float(os.getenv("VAL_SIZE", "0.15"))
+    )
+    max_len: int = field(default_factory=lambda: int(os.getenv("MAX_LEN", "120")))
 
     # --- Word2Vec ---
     vocab_size: int = 20000
@@ -71,6 +123,17 @@ class Config:
 
     # --- Image ---
     image_extensions: set = field(default_factory=lambda: {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff"})
+
+    # --- Model selection (dual-model BiLSTM + BERT) ---
+    # 'bilstm' | 'lstm' | 'bert' | 'all'
+    model_type: str = field(
+        default_factory=lambda: os.getenv("MODEL_TYPE", "all").lower()
+    )
+    bert: BertConfig = field(default_factory=BertConfig)
+    # Threshold default; nilai final di-tuning di validation set per model.
+    default_threshold: float = field(
+        default_factory=lambda: float(os.getenv("DEFAULT_THRESHOLD", "0.5"))
+    )
 
     def ensure_dirs(self) -> None:
         """Create output directories if they don't exist."""

@@ -55,6 +55,9 @@ def build_model(
             output_dim=embed_dim,
             weights=[embedding_matrix],
             trainable=embed_trainable,
+            # FIX (CRITICAL): PAD id=0 harus di-mask agar LSTM tidak
+            # memproses padding sebagai token. Baris 0 embedding = nol.
+            mask_zero=True,
         )
     )
 

@@ -14,7 +14,7 @@ def train_word2vec(
     vector_size: int = 100,
     window: int = 5,
     min_count: int = 3,
-    workers: int = 4,
+    workers: int = 1,
     epochs: int = 30,
     seed: int = 42,
 ) -> Word2Vec:
@@ -71,7 +71,10 @@ def build_embedding_matrix(
         Tuple of (embedding_matrix, num_words, hit_count).
     """
     num_words = min(vocab_size, len(word_index) + 1)
-    embedding_matrix = np.random.normal(scale=0.6, size=(num_words, embed_dim)).astype(
+    # FIX: init OOV kecil (scale 0.1, bukan 0.6) agar vektor acak tidak
+    # mendominasi vektor Word2Vec terlatih (norm ~0.1-1.0). Seed agar stabil.
+    rng = np.random.RandomState(42)
+    embedding_matrix = rng.normal(scale=0.1, size=(num_words, embed_dim)).astype(
         np.float32
     )
     embedding_matrix[0] = np.zeros((embed_dim,), dtype=np.float32)
@@ -91,4 +94,12 @@ def build_embedding_matrix(
         min(num_words, len(word_index)),
         hit_count * 100 / max(1, min(num_words, len(word_index))),
     )
+    coverage = hit_count / max(1, min(num_words, len(word_index)))
+    if coverage < 0.5:
+        logger.warning(
+            "Cakupan Word2Vec rendah (%.1f%%). Kemungkinan mismatch preprocessing "
+            "W2V (stopword dibuang) vs Tokenizer (stopword ada). "
+            "Pertimbangkan samakan pipeline tokenisasi.",
+            coverage * 100,
+        )
     return embedding_matrix, num_words, hit_count
