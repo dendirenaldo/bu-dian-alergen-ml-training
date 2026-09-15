@@ -87,3 +87,6 @@ predictions_test_*.csv
 *.tflite
 saved_models/
 checkpoints/
+
+# Hasil HPC (500MB+, simpan di storage/HPC, bukan git)
+artifacts/bert/bert_hpc_results/

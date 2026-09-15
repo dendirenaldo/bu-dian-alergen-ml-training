@@ -105,7 +105,7 @@ def main(csv_input: str, frozen_holdout: str, out_dir: str) -> None:
         contract["sha256"][name] = h.hexdigest()
     with open(os.path.join(out_dir, "split_contract.json"), "w", encoding="utf-8") as f:
         json.dump(contract, f, indent=2)
-    build_split_manifest(dtr, dva, dho, product_col="nama produk").to_csv(
+    build_split_manifest(dtr, dva, dho, product_col=v5.product_col).to_csv(
         os.path.join(out_dir, "split_manifest.csv"), index=False)
     click.echo(f"BERT-HPC split siap di {out_dir}: " + json.dumps(
         {k: contract[k] for k in ("train_real", "synthetic", "val", "holdout")}))
