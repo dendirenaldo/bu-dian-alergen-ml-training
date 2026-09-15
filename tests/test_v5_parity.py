@@ -177,8 +177,85 @@ def test_repro_audit_holdout_sesuai_kontrak():
     assert all(checks.values())
     with pytest.raises(AssertionError):
         audit_reproducibility_v5(holdout_size=23, expected_holdout_size=50)
+    # Seed custom legal selama konsisten (PYTHONHASHSEED mengikuti seed).
+    os.environ["PYTHONHASHSEED"] = "123"
+    checks = audit_reproducibility_v5(seed=123, w2v_seed=123,
+                                      holdout_size=50, expected_holdout_size=50)
+    assert all(checks.values())
+    os.environ["PYTHONHASHSEED"] = "42"
     with pytest.raises(AssertionError):
-        audit_reproducibility_v5(seed=123)
+        audit_reproducibility_v5(seed=123)  # hashseed 42 != seed 123
+
+
+def test_require_fixed_threshold():
+    import numpy as np
+
+    from app.core.model.metrics import (
+        _require_fixed_threshold,
+        bootstrap_ci_metrics,
+        evaluate_fixed_threshold,
+    )
+
+    assert _require_fixed_threshold(0.5) == 0.5
+    with pytest.raises(ValueError):
+        _require_fixed_threshold(0.7)
+    y = np.array([0, 0, 1, 1])
+    p = np.array([0.1, 0.4, 0.6, 0.9])
+    with pytest.raises(ValueError):
+        evaluate_fixed_threshold(y, p, y, p, threshold=0.7)
+    with pytest.raises(ValueError):
+        bootstrap_ci_metrics(y, p, threshold=0.7)
+
+
+def test_write_thresholds_schema(tmp_path):
+    import json
+
+    from app.core.model.metrics import write_thresholds
+
+    path = str(tmp_path / "thresholds.json")
+    payload = write_thresholds(path, 0.5)
+    assert payload == {"bilstm": 0.5, "fixed": True}
+    assert "lstm" not in payload
+    assert json.load(open(path)) == payload
+
+
+def test_standardize_columns_variants():
+    import pandas as pd
+
+    from app.core.data.gold_merge import standardize_columns
+
+    df = pd.DataFrame({"nama produk": ["a"], "text": ["t"], "label": ["safe"]})
+    out = standardize_columns(df, product_col="nama_produk")
+    assert "nama_produk" in out.columns
+    df2 = pd.DataFrame({"product": ["a"], "text": ["t"], "label": ["safe"]})
+    assert "nama_produk" in standardize_columns(df2).columns
+    df3 = pd.DataFrame({"text": ["t"], "label": ["safe"]})
+    out3 = standardize_columns(df3)
+    assert list(out3["nama_produk"]) == ["produk_0"]
+
+
+def test_parse_clip_norm_edge():
+    import importlib
+    import os
+
+    import app.config as cfgmod
+
+    cases = [("1.0", 1.0), ("0", None), ("none", None), ("", 1.0), ("  ", 1.0)]
+    for val, expected in cases:
+        os.environ["V5_GRADIENT_CLIP_NORM"] = val
+        importlib.reload(cfgmod)
+        assert cfgmod.Config().v5.gradient_clip_norm == expected, val
+    del os.environ["V5_GRADIENT_CLIP_NORM"]
+    importlib.reload(cfgmod)
+    assert cfgmod.Config().v5.gradient_clip_norm == 1.0
+    os.environ["V5_GRADIENT_CLIP_NORM"] = "abc"
+    try:
+        with pytest.raises(ValueError):
+            importlib.reload(cfgmod)
+            cfgmod.Config()
+    finally:
+        del os.environ["V5_GRADIENT_CLIP_NORM"]
+        importlib.reload(cfgmod)
 
 
 def test_config_defaults_final():

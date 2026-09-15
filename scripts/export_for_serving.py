@@ -31,6 +31,13 @@ import pandas as pd
 @click.option("--threshold", type=float, default=0.5,
               help="Threshold fixed (harus sama dengan V5_FIXED_THRESHOLD training).")
 def main(src_dir: str, out_dir: str, eval_csv: str, frozen: str, threshold: float) -> None:
+    from app.config import Config
+
+    contract = float(Config().v5.fixed_threshold)
+    if float(threshold) != contract:
+        raise click.UsageError(
+            f"--threshold {threshold} != V5_FIXED_THRESHOLD kontrak ({contract})."
+        )
     os.makedirs(out_dir, exist_ok=True)
 
     renames = {

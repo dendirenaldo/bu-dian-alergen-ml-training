@@ -41,34 +41,51 @@ def _default_frozen_path() -> str:
     )
 
 
-def _load_frozen_products(config: Config, n_real: int) -> list[str] | None:
+def _frozen_list_sha256(products: list[str]) -> str:
+    import hashlib
+
+    return hashlib.sha256(
+        "\n".join(sorted(str(x) for x in products)).encode("utf-8")
+    ).hexdigest()
+
+
+def _load_frozen_products(config: Config, n_real: int) -> tuple[list[str] | None, str | None]:
     """Tentukan daftar frozen holdout.
 
     Urutan: V5_FROZEN_HOLDOUT_PATH eksplisit -> frozen_holdout.json kemasan
     (kanonis 50/50) -> notebook23 bila n_real == 114 -> re-derive.
+    Bila V5_FROZEN_SHA256 diset, hash daftar wajib cocok (anti-ganti diam-diam).
     """
+    products: list[str] | None = None
     if config.v5.frozen_holdout_path:
         with open(config.v5.frozen_holdout_path, encoding="utf-8") as f:
-            products = json.load(f)
+            products = [str(x) for x in json.load(f)]
         logger.info("Frozen holdout dari file: %s (%d)", config.v5.frozen_holdout_path, len(products))
-        return [str(x) for x in products]
-    packaged = _packaged_frozen_path()
-    if os.path.exists(packaged):
-        with open(packaged, encoding="utf-8") as f:
-            products = json.load(f)
-        logger.info("Frozen holdout kemasan: %s (%d)", packaged, len(products))
-        return [str(x) for x in products]
-    if n_real == 114:
-        with open(_default_frozen_path(), encoding="utf-8") as f:
-            products = json.load(f)
-        logger.info("Frozen holdout default notebook23 (n_real=114, %d)", len(products))
-        return [str(x) for x in products]
+    else:
+        packaged = _packaged_frozen_path()
+        if os.path.exists(packaged):
+            with open(packaged, encoding="utf-8") as f:
+                products = [str(x) for x in json.load(f)]
+            logger.info("Frozen holdout kemasan: %s (%d)", packaged, len(products))
+        elif n_real == 114:
+            with open(_default_frozen_path(), encoding="utf-8") as f:
+                products = [str(x) for x in json.load(f)]
+            logger.info("Frozen holdout default notebook23 (n_real=114, %d)", len(products))
+    if products is not None:
+        expected = (os.getenv("V5_FROZEN_SHA256") or "").strip().lower()
+        actual = _frozen_list_sha256(products)
+        logger.info("Frozen holdout sha256: %s", actual)
+        if expected and expected != actual:
+            raise ValueError(
+                f"Hash frozen holdout {actual} != V5_FROZEN_SHA256 {expected}."
+            )
+        return products, actual
     logger.warning(
         "n_real=%d != 114 dan V5_FROZEN_HOLDOUT_PATH kosong -> re-derive holdout "
         "deterministik exact %d safe/%d unsafe. Simpan hasilnya dan freeze!",
         n_real, config.v5.holdout_safe, config.v5.holdout_unsafe,
     )
-    return None
+    return None, None
 
 
 def run_v5_parity(config: Config | None = None) -> dict:
@@ -132,7 +149,7 @@ def run_v5_parity(config: Config | None = None) -> dict:
         run_v5_split,
     )
 
-    frozen = _load_frozen_products(config, len(df_model_source))
+    frozen, frozen_sha = _load_frozen_products(config, len(df_model_source))
     split = run_v5_split(
         df_model_source,
         product_col=v5.product_col,
@@ -282,6 +299,9 @@ def run_v5_parity(config: Config | None = None) -> dict:
     eval_table = evaluate_fixed_threshold(y_val, val_prob, y_holdout, holdout_prob,
                                           threshold=v5.fixed_threshold)
     eval_table.to_csv(os.path.join(config.output_dir, "evaluation_table_v5.csv"), index=False)
+    pd.DataFrame({"label_id": np.asarray(y_val).astype(int),
+                  "prob_unsafe": np.asarray(val_prob).astype(float)}).to_csv(
+        os.path.join(config.output_dir, "val_probs.csv"), index=False)
     save_training_curves_v5(history, config.output_dir)
     plot_roc_pr_v5(y_val, val_prob, y_holdout, holdout_prob, config.output_dir)
     plot_confusion_v5(y_holdout, holdout_prob, config.output_dir, name="frozen_holdout",
@@ -300,7 +320,8 @@ def run_v5_parity(config: Config | None = None) -> dict:
         config.output_dir, seed=config.seed, threshold=v5.fixed_threshold,
         holdout_size=len(y_holdout),
         extra={"train_size": int(len(y_train)), "val_size": int(len(y_val)),
-               "synthetic_total": int(len(df_sintesis))},
+               "synthetic_total": int(len(df_sintesis)),
+               "frozen_sha256": frozen_sha},
     )
 
     # 9. Simpan model + artefak. Alias serving (bilstm_model.keras) HANYA

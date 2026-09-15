@@ -62,6 +62,9 @@ def triage_gold_kb_bilstm(
 
     Holdout hanya diagnostik — tidak ada tuning dari sini.
     """
+    from app.core.model.metrics import _require_fixed_threshold
+
+    threshold = _require_fixed_threshold(threshold)
     tri = df_holdout.copy().reset_index(drop=True)
     tri["prob_unsafe"] = np.asarray(holdout_prob).astype(float).ravel()
     tri["predicted_label"] = np.where(tri["prob_unsafe"] >= threshold, "unsafe", "safe")
@@ -105,17 +108,20 @@ def audit_reproducibility_v5(
 ) -> dict:
     """Audit lock randomness. Raise bila gagal.
 
-    Ukuran holdout wajib cocok kontrak config (bukan angka notebook lama).
+    Benih tak harus 42 — yang diaudit adalah konsistensi: PYTHONHASHSEED
+    dan seed Word2Vec sama dengan seed run, sehingga --seed CLI legal
+    selama deterministik. Ukuran holdout wajib cocok kontrak config
+    (bukan angka notebook lama).
     """
     checks = {
-        "SEED=42": seed == 42,
-        "PYTHONHASHSEED=42": os.environ.get("PYTHONHASHSEED") == "42",
+        f"SEED recorded ({seed})": isinstance(seed, int) and seed >= 0,
+        "PYTHONHASHSEED matches seed": os.environ.get("PYTHONHASHSEED") == str(seed),
         "TF_DETERMINISTIC_OPS=1": os.environ.get("TF_DETERMINISTIC_OPS") == "1",
         "TF_CUDNN_DETERMINISTIC=1": os.environ.get("TF_CUDNN_DETERMINISTIC") == "1",
         "CUBLAS_WORKSPACE_CONFIG": os.environ.get("CUBLAS_WORKSPACE_CONFIG") == ":4096:8",
         "TF_ENABLE_ONEDNN_OPTS=0": os.environ.get("TF_ENABLE_ONEDNN_OPTS") == "0",
         "Word2Vec workers=1": w2v_workers == 1,
-        "Word2Vec seed=42": w2v_seed == 42,
+        f"Word2Vec seed matches ({seed})": w2v_seed == seed,
         "Train shuffle=False": train_shuffle is False,
         "Fixed threshold=0.50": fixed_threshold == 0.50,
     }

@@ -117,6 +117,13 @@ def save_training_curves_v5(
     return summary
 
 
+def _require_fixed_threshold(threshold: float) -> float:
+    """Tegakkan kontrak threshold fixed 0.50 di semua jalur evaluasi."""
+    if float(threshold) != 0.50:
+        raise ValueError(f"Threshold harus fixed 0.50, dapat {threshold}.")
+    return 0.50
+
+
 def evaluate_fixed_threshold(
     y_val: np.ndarray,
     val_prob: np.ndarray,
@@ -134,8 +141,7 @@ def evaluate_fixed_threshold(
         roc_auc_score,
     )
 
-    if float(threshold) != 0.50:
-        raise ValueError(f"V5 threshold harus fixed 0.50, dapat {threshold}.")
+    threshold = _require_fixed_threshold(threshold)
 
     def row(name: str, y_true: np.ndarray, prob: np.ndarray) -> dict:
         y_true = np.asarray(y_true).astype(int)
@@ -224,6 +230,7 @@ def plot_confusion_v5(
     name: str = "frozen_holdout", threshold: float = 0.50,
 ) -> pd.DataFrame:
     """Confusion matrix + CSV (port Cell 53)."""
+    threshold = _require_fixed_threshold(threshold)
     import matplotlib
 
     matplotlib.use("Agg")
@@ -327,6 +334,8 @@ def bootstrap_ci_metrics(
         recall_score,
         roc_auc_score,
     )
+
+    threshold = _require_fixed_threshold(threshold)
 
     y_true = np.asarray(y_true).astype(int)
     y_prob = np.asarray(y_prob).astype(float)

@@ -100,6 +100,8 @@ plt.close(fig)
 
 # ---------- Gambar: kurva training BiLSTM ----------
 h = pd.read_csv("artifacts/bilstm/output/training_history_bilstm_word2vec_leakage_safe.csv")
+summ = pd.read_csv("artifacts/bilstm/output/training_summary_bilstm_word2vec_leakage_safe.csv").iloc[0]
+BEST_EP = int(summ["best_epoch"])
 ep = np.arange(1, len(h) + 1)
 fig, axes = plt.subplots(1, 2, figsize=(6.5, 2.7))
 ax = axes[0]
@@ -107,13 +109,13 @@ ax.plot(ep, h["accuracy"], color=BLUE, lw=1.6, label="Train accuracy")
 ax.plot(ep, h["val_accuracy"], color=ORANGE, lw=1.6, marker="o", ms=3, label="Validation accuracy")
 ax.plot(ep, h["f1"], color=BLUE, lw=1.0, ls="--", label="Train F1")
 ax.plot(ep, h["val_f1"], color=ORANGE, lw=1.0, ls="--", label="Validation F1")
-ax.axvline(16, color="gray", lw=0.9, ls=":", label="Best epoch (16)")
+ax.axvline(BEST_EP, color="gray", lw=0.9, ls=":", label=f"Best epoch ({BEST_EP})")
 ax.set_xlabel("Epoch"); ax.set_ylabel("Score"); ax.set_ylim(0.4, 1.02)
 ax.legend(frameon=True, ncol=2, loc="upper center", bbox_to_anchor=(0.5, -0.22))
 ax = axes[1]
 ax.plot(ep, h["loss"], color=BLUE, lw=1.6, label="Train loss")
 ax.plot(ep, h["val_loss"], color=ORANGE, lw=1.6, marker="o", ms=3, label="Validation loss")
-ax.axvline(16, color="gray", lw=0.9, ls=":")
+ax.axvline(BEST_EP, color="gray", lw=0.9, ls=":")
 ax.set_xlabel("Epoch"); ax.set_ylabel("Binary cross-entropy loss"); ax.legend(frameon=True)
 fig.tight_layout(pad=1.0)
 fig.savefig(f"{OUT}/fig_training_bilstm.png", dpi=300, bbox_inches="tight")
@@ -128,7 +130,8 @@ fig, axes = plt.subplots(1, 2, figsize=(6.5, 2.7))
 ax = axes[0]
 ax.plot([t[0] for t in tr], [t[1] for t in tr], color=BLUE, lw=1.6, marker="o", ms=4, label="Train loss")
 ax.plot([t[0] for t in ev], [t[1] for t in ev], color=ORANGE, lw=1.6, marker="s", ms=4, label="Validation loss")
-ax.axvline(3, color="gray", lw=0.9, ls=":", label="Best epoch (3)")
+BEST_BERT = min(ev, key=lambda t: t[1])[0]
+ax.axvline(BEST_BERT, color="gray", lw=0.9, ls=":", label=f"Best epoch ({BEST_BERT:g})")
 ax.set_xlabel("Epoch"); ax.set_ylabel("Loss"); ax.legend(frameon=True)
 ax = axes[1]
 ax.plot([t[0] for t in ev], [t[2] for t in ev], color=GREEN, lw=1.6, marker="o", ms=4, label="Validation F1")
@@ -139,7 +142,35 @@ fig.savefig(f"{OUT}/fig_training_bert.png", dpi=300, bbox_inches="tight")
 plt.close(fig)
 
 # ---------- ROC + PR ----------
-bp = json.load(open("/tmp/bilstm_probs.json"))
+def _cm_from_probs(path, label_col=None, prob_col="prob_unsafe", thr=0.5):
+    d = pd.read_csv(path)
+    lc = label_col or ("label_id" if "label_id" in d.columns else "label")
+    if d[lc].dtype == object:
+        yt = (d[lc].astype(str).str.lower() == "unsafe").astype(int).values
+    else:
+        yt = d[lc].astype(int).values
+    pr = (d[prob_col].astype(float).values >= thr).astype(int)
+    return confusion_matrix(yt, pr, labels=[0, 1])
+
+
+def _cm_from_triage(path, label_col="gold_label", prob_col="prob_unsafe", thr=0.5):
+    d = pd.read_csv(path)
+    assert (d["error_triage"] != "UNCLASSIFIED").all()
+    return _cm_from_probs(path, label_col=label_col, prob_col=prob_col, thr=thr)
+
+
+def _probs(path, label_col=None, prob_col="prob_unsafe"):
+    d = pd.read_csv(path)
+    lc = label_col or ("label_id" if "label_id" in d.columns else "label")
+    if d[lc].dtype == object:
+        y = (d[lc].astype(str).str.lower() == "unsafe").astype(int).tolist()
+    else:
+        y = d[lc].astype(int).tolist()
+    return {"y": y, "p": d[prob_col].astype(float).tolist()}
+
+
+bp = {"hold": _probs("artifacts/bilstm/output/gold_kb_bilstm_triage.csv", label_col="gold_label"),
+      "val": _probs("artifacts/bilstm/output/val_probs.csv", label_col="label_id")}
 roc_bert = json.load(open("artifacts/bert/bert_hpc_results/roc_data.json"))
 bval = bp["val"]; bhold = bp["hold"]
 bv_fpr, bv_tpr, _ = roc_curve(bval["y"], bval["p"])
@@ -172,10 +203,27 @@ fig.savefig(f"{OUT}/fig_roc_pr.png", dpi=300, bbox_inches="tight")
 plt.close(fig)
 
 # ---------- Confusion matrices 2x2 ----------
-cm_bv = np.array([[23, 2], [2, 23]])   # BiLSTM val: acc .92 prec/rec .92
-cm_bh = np.array([[17, 8], [1, 24]])   # BiLSTM holdout (artefak)
-cm_tv = np.array([[25, 0], [1, 24]])   # BERT val (artefak HPC)
-cm_th = np.array([[23, 2], [3, 22]])   # BERT holdout (artefak HPC)
+def _cm_from_triage(path, label_col="gold_label", prob_col="prob_unsafe", thr=0.5):
+    d = pd.read_csv(path)
+    yt = (d[label_col].astype(str).str.lower() == "unsafe").astype(int).values
+    pr = (d[prob_col].astype(float).values >= thr).astype(int)
+    return confusion_matrix(yt, pr, labels=[0, 1])
+
+cm_bh = _cm_from_triage("artifacts/bilstm/output/gold_kb_bilstm_triage.csv")
+cm_bv = _cm_from_probs("artifacts/bilstm/output/val_probs.csv")
+cm_tv = _cm_from_probs("artifacts/bert/bert_hpc_results/probs_val.csv")
+cm_th = _cm_from_probs("artifacts/bert/bert_hpc_results/probs_holdout.csv")
+
+
+def _cm_from_probs(path, label_col=None, prob_col="prob_unsafe", thr=0.5):
+    d = pd.read_csv(path)
+    lc = label_col or ("label_id" if "label_id" in d.columns else "label")
+    if d[lc].dtype == object:
+        yt = (d[lc].astype(str).str.lower() == "unsafe").astype(int).values
+    else:
+        yt = d[lc].astype(int).values
+    pr = (d[prob_col].astype(float).values >= thr).astype(int)
+    return confusion_matrix(yt, pr, labels=[0, 1])
 fig, axes = plt.subplots(2, 2, figsize=(6.2, 5.2))
 for ax, cm, tag in zip(axes.ravel(),
                        [cm_bv, cm_bh, cm_tv, cm_th],

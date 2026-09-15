@@ -45,9 +45,9 @@ def build_model(
         recurrent_dropout: Recurrent dropout (set to 0 for cuDNN compatibility).
         dense_units: Units for the dense layer.
         dropout_rate_dense: Dropout rate after the dense layer.
-        gradient_clip_norm: Gradient clipping norm value (None = disabled, V5 parity).
-        mask_zero: Mask PAD id=0 (V5 parity=False, mengikuti notebook).
-        use_maxnorm: Batasi Dense dengan MaxNorm(3) (V5 parity=False).
+        gradient_clip_norm: Gradient clipping norm value (None = disabled).
+        mask_zero: Mask PAD id=0 (final default True; padding 71-85% adalah noise).
+        use_maxnorm: Batasi Dense dengan MaxNorm(3) (final default False).
 
     Returns:
         Compiled Keras model.
@@ -59,9 +59,8 @@ def build_model(
             output_dim=embed_dim,
             weights=[embedding_matrix],
             trainable=embed_trainable,
-            # FIX (CRITICAL): PAD id=0 harus di-mask agar LSTM tidak
-            # memproses padding sebagai token. Baris 0 embedding = nol.
-            # V5 parity menonaktifkan ini agar persis notebook.
+            # PAD id=0 di-mask agar LSTM tidak memproses padding sebagai token.
+            # Baris 0 embedding = nol.
             mask_zero=mask_zero,
         )
     )
