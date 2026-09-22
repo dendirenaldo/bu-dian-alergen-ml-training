@@ -41,51 +41,25 @@ def _default_frozen_path() -> str:
     )
 
 
-def _frozen_list_sha256(products: list[str]) -> str:
-    import hashlib
-
-    return hashlib.sha256(
-        "\n".join(sorted(str(x) for x in products)).encode("utf-8")
-    ).hexdigest()
-
-
 def _load_frozen_products(config: Config, n_real: int) -> tuple[list[str] | None, str | None]:
-    """Tentukan daftar frozen holdout.
+    """Tentukan daftar frozen holdout (delegasi ke modul frozen bersama).
 
     Urutan: V5_FROZEN_HOLDOUT_PATH eksplisit -> frozen_holdout.json kemasan
-    (kanonis 50/50) -> notebook23 bila n_real == 114 -> re-derive.
-    Bila V5_FROZEN_SHA256 diset, hash daftar wajib cocok (anti-ganti diam-diam).
+    (48 nama unik -> 50 baris holdout 25/25 setelah normalisasi menyatukan
+    varian kapitalisasi) -> notebook23 bila n_real == 114 -> re-derive.
+
+    Hash kanonis (``frozen_list_sha256``) selalu dihitung dan divalidasi
+    terhadap env ``V5_FROZEN_SHA256`` bila diset — konsisten di seluruh
+    jalur (trainer/bootstrap/rebuild) karena satu implementasi.
     """
-    products: list[str] | None = None
-    if config.v5.frozen_holdout_path:
-        with open(config.v5.frozen_holdout_path, encoding="utf-8") as f:
-            products = [str(x) for x in json.load(f)]
-        logger.info("Frozen holdout dari file: %s (%d)", config.v5.frozen_holdout_path, len(products))
-    else:
-        packaged = _packaged_frozen_path()
-        if os.path.exists(packaged):
-            with open(packaged, encoding="utf-8") as f:
-                products = [str(x) for x in json.load(f)]
-            logger.info("Frozen holdout kemasan: %s (%d)", packaged, len(products))
-        elif n_real == 114:
-            with open(_default_frozen_path(), encoding="utf-8") as f:
-                products = [str(x) for x in json.load(f)]
-            logger.info("Frozen holdout default notebook23 (n_real=114, %d)", len(products))
-    if products is not None:
-        expected = (os.getenv("V5_FROZEN_SHA256") or "").strip().lower()
-        actual = _frozen_list_sha256(products)
-        logger.info("Frozen holdout sha256: %s", actual)
-        if expected and expected != actual:
-            raise ValueError(
-                f"Hash frozen holdout {actual} != V5_FROZEN_SHA256 {expected}."
-            )
-        return products, actual
-    logger.warning(
-        "n_real=%d != 114 dan V5_FROZEN_HOLDOUT_PATH kosong -> re-derive holdout "
-        "deterministik exact %d safe/%d unsafe. Simpan hasilnya dan freeze!",
-        n_real, config.v5.holdout_safe, config.v5.holdout_unsafe,
+    from app.core.data.frozen import resolve_frozen_products
+
+    return resolve_frozen_products(
+        explicit_path=config.v5.frozen_holdout_path,
+        packaged_path=_packaged_frozen_path(),
+        notebook23_path=_default_frozen_path(),
+        n_real=n_real,
     )
-    return None, None
 
 
 def run_v5_parity(config: Config | None = None) -> dict:
@@ -126,11 +100,12 @@ def run_v5_parity(config: Config | None = None) -> dict:
     )
     df_raw = standardize_columns(
         df_raw, product_col=v5.product_col,
-        text_col=config.text_col, label_col="label",
+        text_col=config.text_col, label_col=config.label_col,
     )
     text_src = config.text_col if config.text_col in df_raw.columns else v5.text_col
     df_model_source = build_model_source_from_single(
-        df_raw, product_col=v5.product_col, text_col=text_src, label_col="label",
+        df_raw, product_col=v5.product_col, text_col=text_src,
+        label_col=config.label_col,
     )
     logger.info("Model source: %d rows, groups=%d", len(df_model_source),
                 df_model_source["group_key"].nunique())
@@ -273,6 +248,7 @@ def run_v5_parity(config: Config | None = None) -> dict:
 
     # 8. Evaluasi fixed threshold + artefak.
     from app.core.model.audit import (
+        audit_final_config_v5,
         audit_pipeline_consistency_v5,
         audit_reproducibility_v5,
         triage_gold_kb_bilstm,
@@ -293,6 +269,9 @@ def run_v5_parity(config: Config | None = None) -> dict:
                              TRAIN_SHUFFLE, v5.fixed_threshold,
                              holdout_size=len(y_holdout),
                              expected_holdout_size=v5.holdout_size)
+    # Audit konfigurasi final (LR/clip/mask/min_count/preshuffle/digit_fold/
+    # split) — gagal keras bila env override menyimpang dari kontrak.
+    final_config = audit_final_config_v5(v5)
 
     val_prob = model.predict(X_val_pad, verbose=0).ravel()
     holdout_prob = model.predict(X_holdout_pad, verbose=0).ravel()
@@ -321,7 +300,8 @@ def run_v5_parity(config: Config | None = None) -> dict:
         holdout_size=len(y_holdout),
         extra={"train_size": int(len(y_train)), "val_size": int(len(y_val)),
                "synthetic_total": int(len(df_sintesis)),
-               "frozen_sha256": frozen_sha},
+               "frozen_sha256": frozen_sha,
+               "final_config": final_config},
     )
 
     # 9. Simpan model + artefak. Alias serving (bilstm_model.keras) HANYA

@@ -222,7 +222,14 @@ def plot_roc_pr_v5(
         plt.savefig(os.path.join(output_dir, f"pr_curve_{prefix}.png"))
         plt.close()
     else:
-        logger.warning("ROC/PR di-skip: salah satu split single-class.")
+        # ROC/PR adalah audit wajib (pilar 7): single-class = run gagal,
+        # bukan diam-diam di-skip (kontrak split butuh kedua kelas).
+        val_cls = len(np.unique(np.asarray(y_val)))
+        hold_cls = len(np.unique(np.asarray(y_holdout)))
+        raise ValueError(
+            f"ROC/PR gagal: split single-class (val kelas={val_cls}, "
+            f"holdout kelas={hold_cls}). Periksa komposisi split/val."
+        )
 
 
 def plot_confusion_v5(
@@ -278,10 +285,25 @@ def write_experiment_manifest(
     output_dir: str,
     seed: int = 42,
     threshold: float = 0.50,
-    holdout_size: int = 23,
+    holdout_size: int = 50,
     extra: dict | None = None,
 ) -> str:
-    """Manifest eksperimen (port Cell 64)."""
+    """Manifest eksperimen (port Cell 64).
+
+    Threshold diveralidasi (kontrak fixed 0.5) dan key inti tidak boleh
+    ditimpa oleh ``extra`` (antithreat anti-tamper manifest).
+    """
+    threshold = _require_fixed_threshold(threshold)
+    core_keys = {
+        "experiment", "seed", "threshold", "holdout_size", "holdout_frozen",
+        "gold_label_is_ground_truth", "synthetic_after_real_split",
+        "synthetic_source", "tokenizer_fit_source", "word2vec_workers",
+        "architecture_unchanged", "required_audits",
+    }
+    if extra:
+        clash = core_keys & set(extra)
+        if clash:
+            raise ValueError(f"extra tidak boleh menimpa key inti manifest: {sorted(clash)}")
     manifest = {
         "experiment": "Experiment 1 — Reproducible Leakage-Safe BiLSTM (port)",
         "seed": int(seed),
@@ -366,10 +388,15 @@ def bootstrap_ci_metrics(
 
 
 def write_thresholds(path: str, threshold: float = 0.5) -> dict:
-    """Tulis thresholds.json kanonis tunggal: {"bilstm": thr, "fixed": True}."""
+    """Tulis thresholds.json kanonis tunggal: {"bilstm": 0.5, "fixed": True}.
+
+    Threshold wajib 0.5 (kontrak); nilai lain menolak menulis file —
+    mencegah drift antara training/serving.
+    """
     import json as _json
     import os as _os
 
+    threshold = _require_fixed_threshold(threshold)
     payload = {"bilstm": float(threshold), "fixed": True}
     _os.makedirs(_os.path.dirname(_os.path.abspath(path)), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:

@@ -144,10 +144,60 @@ def audit_pipeline_consistency_v5(
     holdout_used_in_fit: bool = False,
     fixed_threshold: float = 0.50,
 ) -> None:
-    """Guard konsistensi pipeline (port Cell 71). Raise bila inkonsisten."""
-    assert holdout_used_in_fit is False, "Holdout tidak boleh masuk model.fit()."
-    assert fixed_threshold == 0.50, "Threshold harus fixed 0.50."
-    assert n_synthetic == synthetic_total, "Ukuran synthetic tidak sesuai kontrak."
+    """Guard konsistensi pipeline (port Cell 71). Raise eksplisit bila gagal.
+
+    (Gaya ``raise ValueError`` bukan ``assert`` mentah — assert bisa
+    dinonaktifkan dengan ``python -O`` dan tidak membawa pesan audit.)
+    """
+    from app.core.model.metrics import _require_fixed_threshold
+
+    if holdout_used_in_fit:
+        raise ValueError("Holdout tidak boleh masuk model.fit().")
+    _require_fixed_threshold(fixed_threshold)
+    if n_synthetic != synthetic_total:
+        raise ValueError(
+            f"Ukuran synthetic {n_synthetic} != kontrak {synthetic_total}."
+        )
     for name, d in (("train", df_real_train), ("val", df_real_val), ("holdout", df_holdout)):
-        assert "label_id" in d.columns, f"Split {name} butuh label_id."
-        assert d["label_id"].isin([0, 1]).all(), f"Split {name} label invalid."
+        if "label_id" not in d.columns:
+            raise ValueError(f"Split {name} butuh kolom label_id.")
+        if not d["label_id"].isin([0, 1]).all():
+            raise ValueError(f"Split {name} memiliki label_id di luar {0, 1}.")
+        if len(np.unique(d["label_id"].to_numpy())) < 2:
+            raise ValueError(
+                f"Split {name} single-class — ROC/PR/AUC tidak terdefinisi. "
+                "Periksa komposisi split."
+            )
+
+
+def audit_final_config_v5(v5) -> dict:
+    """Audit konfigurasi final aktual (kontrak D1/D2/D3 + keputusan Fase 2-4).
+
+    Gagal keras bila ada override env yang menyimpang dari kontrak final.
+    Return dict nilai aktual untuk direkam ke manifest.
+    """
+    checks = {
+        "learning_rate==1e-4 (D2)": float(v5.learning_rate) == 1e-4,
+        "gradient_clip==1.0 (D1)": v5.gradient_clip_norm == 1.0,
+        "mask_zero=True (D3)": v5.mask_zero is True,
+        "w2v_min_count==1": int(v5.w2v_min_count) == 1,
+        "digit_fold==False": v5.digit_fold is False,
+        "preshuffle==False": v5.preshuffle is False,
+        "train_shuffle==False": v5.train_shuffle is False,
+        "holdout 25/25": (v5.holdout_safe, v5.holdout_unsafe) == (25, 25),
+        "val 25/25": (v5.val_safe, v5.val_unsafe) == (25, 25),
+        "synthetic_total==1000": int(v5.synthetic_total) == 1000,
+        "embed_trainable==True": v5.embed_trainable is True,
+    }
+    if not all(checks.values()):
+        bad = [k for k, ok in checks.items() if not ok]
+        raise ValueError(f"Audit konfigurasi final GAGAL (override env?): {bad}")
+    return {
+        "learning_rate": float(v5.learning_rate),
+        "gradient_clip_norm": float(v5.gradient_clip_norm),
+        "mask_zero": bool(v5.mask_zero),
+        "w2v_min_count": int(v5.w2v_min_count),
+        "digit_fold": bool(v5.digit_fold),
+        "preshuffle": bool(v5.preshuffle),
+        "synthetic_total": int(v5.synthetic_total),
+    }

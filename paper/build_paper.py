@@ -370,9 +370,9 @@ table(["Metrik (kelas unsafe)", "Nilai"],
       widths=[7.5, 8.0])
 caption("Tabel", "4.2", "Kinerja KB berbasis aturan terhadap label acuan (diagnostik, bukan acuan).")
 P("Audit tingkat token memperkuat kebutuhan pra-pemrosesan yang hati-hati. Pada teks latih riil, rata-rata panjang sekuens adalah "
-  "34,3 token (median 28; persentil-95 sebesar 75), sehingga batas max_len=120 menyisakan sekitar 71% padding — fakta yang mendasari "
-  "keputusan masking pada arsitektur. Sebanyak 37,5% kosakata latih riil adalah hapax legomena (muncul sekali), sekalipun hanya mencakup "
-  "2,5% kemunculan token; 132 token berupa digit murni (kadar persen dan takaran) memecah kosakata. Temuan ini menjadi dasar eksperimen "
+  "34,8 token (median 28; persentil-95 sebesar 79), sehingga batas max_len=120 menyisakan sekitar 71% padding — fakta yang mendasari "
+  "keputusan masking pada arsitektur. Sebanyak 36,3% kosakata latih riil adalah hapax legomena (muncul sekali), sekalipun hanya mencakup "
+  "2,6% kemunculan token; 128 token berupa digit murni (kadar persen dan takaran) memecah kosakata. Temuan ini menjadi dasar eksperimen "
   "ablasi pra-pemrosesan, yang menyimpulkan bahwa masking padding membantu, sedangkan pelipatan digit justru menghilangkan sinyal kadar "
   "yang diskriminatif.")
 
@@ -403,7 +403,7 @@ P("Riwayat pelatihan BiLSTM selama maksimum 20 epoch ditunjukkan pada Gambar 4.2
 figure(f"{FIG}/fig_training_bilstm.png", 15.5, "Gambar", "4.2",
        "Riwayat pelatihan BiLSTM: (kiri) akurasi dan F1 latih vs validasi; (kanan) loss latih vs validasi. Garis vertikal menandai epoch terbaik (16).")
 P("Dua catatan metodologis penting. ", ("Pertama", True),
-  ", fluktuasi kecil kurva validasi (misalnya akurasi validasi berosilasi antara 0,92 dan 0,94) bukanlah overfitting, melainkan kuantisasi "
+  ", fluktuasi kecil kurva validasi (misalnya akurasi validasi berosilasi antara 0,92 dan 0,96) bukanlah overfitting, melainkan kuantisasi "
   "sampel kecil: dengan n=50, satu sampel bernilai 2%. ", ("Kedua", True),
   ", pada epoch 1 akurasi validasi (0,94) tampak lebih tinggi daripada akurasi latih (0,48); hal ini wajar karena regularisasi dropout aktif "
   "hanya saat latih dan himpunan latih mengandung sampel sintetik yang lebih sulit, bukan indikasi kebocoran — audit leakage pada Sub-bab 4.3 "
@@ -422,14 +422,14 @@ figure(f"{FIG}/fig_training_bert.png", 15.5, "Gambar", "4.3",
 
 h2("4.6  Hasil Evaluasi")
 P("Tabel 4.4 dan 4.5 merangkum kinerja kedua model pada ambang tetap 0,5 beserta interval kepercayaan 95% dari 2.000 ulangan bootstrap "
-  "terstratifikasi. Pada validasi, IndoBERT unggul di semua metrik (F1 0,980; IK 0,936–1,000; AUC 0,995) atas BiLSTM (F1 0,921; IK 0,840–0,980; "
-  "AUC 0,977). Pada himpunan beku — ukuran yang bersih dari bias seleksi — IndoBERT mencatat F1 0,899 (IK 0,809–0,980; AUC 0,984), sedangkan "
+  "terstratifikasi. Pada validasi, IndoBERT unggul di semua metrik (F1 0,980; IK 0,936–1,000; AUC 0,995) atas BiLSTM (F1 0,920; IK 0,840–0,980; "
+  "AUC 0,976). Pada himpunan beku — ukuran yang bersih dari bias seleksi — IndoBERT mencatat F1 0,898 (IK 0,809–0,980; AUC 0,984), sedangkan "
   "BiLSTM mencatat F1 0,842 (IK 0,764–0,926; AUC 0,907).")
 table(["Model", "Split", "Akurasi", "Presisi", "Recall", "F1 [IK 95%]", "ROC-AUC [IK 95%]"],
-      [["BiLSTM", "Validasi (50)", "0,920", "0,920", "0,920", "0,921 [0,840–0,980]", "0,977 [0,930–1,000]"],
+      [["BiLSTM", "Validasi (50)", "0,920", "0,920", "0,920", "0,920 [0,840–0,980]", "0,976 [0,930–1,000]"],
        ["BiLSTM", "Beku (50)", "0,820", "0,750", "0,960", "0,842 [0,764–0,926]", "0,907 [0,808–0,987]"],
        ["IndoBERT", "Validasi (50)", "0,980", "1,000", "0,960", "0,980 [0,936–1,000]", "0,995 [0,981–1,000]"],
-       ["IndoBERT", "Beku (50)", "0,900", "0,917", "0,880", "0,899 [0,809–0,980]", "0,984 [0,955–1,000]"]],
+       ["IndoBERT", "Beku (50)", "0,900", "0,917", "0,880", "0,898 [0,809–0,980]", "0,984 [0,955–1,000]"]],
       widths=[2.2, 2.6, 1.8, 1.8, 1.8, 3.2, 3.2], size=9)
 caption("Tabel", "4.4", "Ringkasan evaluasi kedua model pada ambang tetap 0,5 (IK = interval kepercayaan bootstrap 95%, 2.000 ulangan).")
 
@@ -470,14 +470,14 @@ P("Pola kesalahan IndoBERT berbeda dan saling melengkapi: tiga negatif-palsu him
 
 h2("4.10  Perbandingan BiLSTM dan IndoBERT")
 P("Perbandingan apel-vs-apel dimungkinkan karena kedua model memakai pool latih, validasi, himpunan beku, dan ambang yang identik. Estimasi titik "
-  "memihak IndoBERT di hampir semua metrik (misalnya F1 beku 0,899 vs 0,842; AUC 0,984 vs 0,907), kecuali recall himpunan beku yang dimenangkan "
+  "memihak IndoBERT di hampir semua metrik (misalnya F1 beku 0,898 vs 0,842; AUC 0,984 vs 0,907), kecuali recall himpunan beku yang dimenangkan "
   "BiLSTM (0,96 vs 0,88). Namun interval kepercayaan 95% keduanya bertumpang-tindih pada himpunan beku (F1: 0,764–0,926 vs 0,809–0,980), sehingga "
   "klaim superioritas statistik memerlukan himpunan uji yang lebih besar — kejujuran ini kami nyatakan eksplisit agar tidak terjadi overklaim. "
   "Secara praktis, IndoBERT unggul karena representasi kontekstual dan tokenisasi subword-nya tahan terhadap kosakata jarang dan galat OCR yang "
   "melumpuhkan embedding kata-utuh Word2Vec (OOV validasi 3,96%; holdout 5,01%), dengan harga komputasi dan ketergantungan pra-latih yang jauh "
   "lebih besar.")
 table(["Aspek", "BiLSTM", "IndoBERT"],
-      [["F1 beku", "0,842", "0,899"],
+      [["F1 beku", "0,842", "0,898"],
        ["AUC beku", "0,907", "0,984"],
        ["Recall beku", "0,960 (unggul)", "0,880"],
        ["Ketahanan OOV/galat OCR", "Terbatas (kata utuh)", "Kuat (subword + konteks)"],

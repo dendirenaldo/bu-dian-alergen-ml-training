@@ -97,8 +97,8 @@ def main():
     warnings.filterwarnings(
         "ignore", message="Was asked to gather along dimension 0.*")
     ap = argparse.ArgumentParser()
-    ap.add_argument("--data-dir", default="./bert_hpc")
-    ap.add_argument("--output-dir", default="./bert_hpc_results")
+    ap.add_argument("--data-dir", default="./input")
+    ap.add_argument("--output-dir", default="./results")
     ap.add_argument("--model-name", default="indobenchmark/indobert-base-p1")
     ap.add_argument("--train-file", default="train_combined.csv")
     ap.add_argument("--epochs", type=int, default=4)

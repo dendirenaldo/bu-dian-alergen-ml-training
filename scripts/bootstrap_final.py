@@ -7,7 +7,6 @@ lalu menulis bootstrap_ci_v5.csv. Semua path dari Config/env.
 
 from __future__ import annotations
 
-import json
 import os
 import pickle
 import sys
@@ -17,7 +16,6 @@ import click
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pandas as pd
-import tensorflow as tf
 
 from app.config import Config
 from app.core.data.gold_merge import build_model_source_from_single, standardize_columns
@@ -34,6 +32,13 @@ def main(csv_input: str | None, frozen_holdout: str | None,
          output_dir: str | None, model_dir: str | None) -> None:
     config = Config()
     v5 = config.v5
+    # Repro lock SEBELUM import TF (kontrak determinisme, sama dengan trainer).
+    from app.repro import apply_reproducibility_lock, seed_all
+
+    apply_reproducibility_lock(config.seed)
+    seed_all(config.seed)
+    import tensorflow as tf  # noqa: PLC0415 — sengaja setelah lock
+
     csv_input = csv_input or config.csv_input
     frozen_path = frozen_holdout or v5.frozen_holdout_path
     if not frozen_path:
@@ -47,7 +52,10 @@ def main(csv_input: str | None, frozen_holdout: str | None,
     text_src = config.text_col if config.text_col in df_raw.columns else v5.text_col
     df_model_source = build_model_source_from_single(
         df_raw, product_col=v5.product_col, text_col=text_src)
-    frozen = json.load(open(frozen_path, encoding="utf-8"))
+    # Melalui load_frozen_products -> hash V5_FROZEN_SHA256 selalu divalidasi.
+    from app.core.data.frozen import load_frozen_products
+
+    frozen, frozen_sha = load_frozen_products(frozen_path)
     split = run_v5_split(
         df_model_source, product_col=v5.product_col, text_col=text_src,
         frozen_products=frozen, holdout_safe=v5.holdout_safe,
@@ -77,7 +85,7 @@ def main(csv_input: str | None, frozen_holdout: str | None,
     rows = []
     for name, yt, yp in (("validation", y_val, p_val), ("frozen_holdout", y_hold, p_hold)):
         ci = bootstrap_ci_metrics(yt, yp, threshold=v5.fixed_threshold,
-                                  n_bootstrap=2000, seed=42)
+                                  n_bootstrap=2000, seed=config.seed)
         ci.insert(0, "split", name)
         rows.append(ci)
     ci_table = pd.concat(rows, ignore_index=True)

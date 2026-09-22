@@ -1,0 +1,29 @@
+{
+  "model_name": "indobenchmark/indobert-base-p1",
+  "seed": 42,
+  "epochs": 4,
+  "lr": 2e-05,
+  "batch_size": 16,
+  "max_len": 256,
+  "train_file": "train_combined.csv",
+  "validation": {
+    "n": 50,
+    "accuracy": 0.98,
+    "precision": 1.0,
+    "recall": 0.96,
+    "f1": 0.9795918367346939,
+    "roc_auc": 0.9952,
+    "average_precision": 0.9957142857142858,
+    "threshold": 0.5
+  },
+  "holdout": {
+    "n": 50,
+    "accuracy": 0.9,
+    "precision": 0.9166666666666666,
+    "recall": 0.88,
+    "f1": 0.8979591836734694,
+    "roc_auc": 0.984,
+    "average_precision": 0.9845125290168768,
+    "threshold": 0.5
+  }
+}

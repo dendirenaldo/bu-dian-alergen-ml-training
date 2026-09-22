@@ -60,13 +60,17 @@ tokenizer_*.pkl
 
 # Generated datasets (besar; kontraknya split_contract.json + skrip rebuild)
 artifacts/bert/input/*.csv
-artifacts/bert/results/
+# Hasil HPC: hanya BOBOL/LOG BESAR yang di-ignore; file kecil
+# (probs_*.csv, roc_data, training_log, threshold) WAJIB di-track
+# karena paper/make_figs.py membacanya.
+artifacts/bert/results/model/
+artifacts/bert/results/checkpoints/
+artifacts/bert/results/*.bin
+artifacts/bert/results_realonly/
 
-# Training outputs (besar; yang kecil & penting di-track eksplisit via git add -f)
+# Training outputs: PNG regenerable di-ignore; CSV audit/triage HARUS
+# di-track (input paper + jejak audit).
 artifacts/bilstm/output/*.png
-artifacts/bilstm/output/training_history_*.csv
-artifacts/bilstm/output/*triage*.csv
-artifacts/bilstm/output/frozen_holdout_*.csv
 
 # OCR output (generated, not source)
 ocr_output/
@@ -76,9 +80,7 @@ dataset/*.jpg
 dataset/*.jpeg
 dataset/*.png
 
-# Training outputs
-training_history_*.csv
-evaluation_table_*.csv
+# Training outputs (legacy pola; pola artefak spesifik sudah di atas)
 classification_report_*.csv
 predictions_test_*.csv
 
@@ -91,4 +93,3 @@ saved_models/
 checkpoints/
 
 # Hasil HPC (500MB+, simpan di storage/HPC, bukan git)
-artifacts/bert/bert_hpc_results/

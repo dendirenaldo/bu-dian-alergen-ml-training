@@ -83,9 +83,11 @@ results/
 ```
 
 Dengan `probs_*.csv`, CI bootstrap + kurva ROC/PR gabungan BiLSTM-vs-BERT
-dihitung lokal tanpa akses HPC (skrip `scripts/bootstrap_final.py` sebagai pola.
+dihitung lokal tanpa akses HPC dengan skrip `paper/make_figs.py`
+(membaca `probs_val/probs_holdout` + `split_manifest` — bootstrap CI BiLSTM
+di `scripts/bootstrap_final.py` sebagai pola angka).
 
-> Hasil training diletakkan di `artifacts/bert/results/` (setara `artifacts/bilstm/`).).
+> Hasil training diletakkan di `artifacts/bert/results/` (setara `artifacts/bilstm/`).
 
 ## 4. Troubleshooting
 

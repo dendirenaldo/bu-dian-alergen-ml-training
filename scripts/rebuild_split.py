@@ -48,7 +48,10 @@ def main(csv_input: str, frozen_holdout: str, out_dir: str) -> None:
     text_src = config.text_col if config.text_col in df_raw.columns else v5.text_col
     src = build_model_source_from_single(df_raw, product_col=v5.product_col,
                                          text_col=text_src)
-    frozen = json.load(open(frozen_holdout, encoding="utf-8"))
+    # Melalui load_frozen_products -> hash V5_FROZEN_SHA256 selalu divalidasi.
+    from app.core.data.frozen import load_frozen_products
+
+    frozen, frozen_sha = load_frozen_products(frozen_holdout)
     split = run_v5_split(
         src, product_col=v5.product_col, text_col=text_src,
         frozen_products=frozen, holdout_safe=v5.holdout_safe,
@@ -95,6 +98,7 @@ def main(csv_input: str, frozen_holdout: str, out_dir: str) -> None:
         "val": len(dva),
         "holdout": len(dho),
         "frozen_holdout_file": os.path.basename(frozen_holdout),
+        "frozen_sha256": frozen_sha,
         "sha256": {},
     }
     for name in ("train_real.csv", "synthetic.csv", "train_combined.csv",

@@ -43,7 +43,10 @@ python scripts/export_for_serving.py
 Penyetelan lanjutan via env `V5_*` (lihat `.env.example`):
 `V5_LEARNING_RATE`, `V5_EPOCHS`, `V5_BATCH_SIZE`, `V5_MASK_ZERO`,
 `V5_W2V_MIN_COUNT`, `V5_MAX_LEN`, `V5_DIGIT_FOLD`, `V5_SHUFFLE`,
-`V5_GRADIENT_CLIP_NORM`, `V5_HOLDOUT_*`, `V5_VAL_*`, `V5_SYNTHETIC_TOTAL`.
+`V5_GRADIENT_CLIP_NORM`, `V5_HOLDOUT_*`, `V5_VAL_*`, `V5_SYNTHETIC_TOTAL`,
+`V5_FIXED_THRESHOLD` (wajib 0.5), `V5_FROZEN_HOLDOUT_PATH`,
+`V5_FROZEN_SHA256` (anti-tamper daftar frozen; cara hitung di `.env.example`),
+`V5_PRODUCT_COL`, `V5_TEXT_COL`.
 
 ## Pipeline
 
@@ -79,7 +82,9 @@ Penyetelan lanjutan via env `V5_*` (lihat `.env.example`):
 ### output/
 - `evaluation_table_v5.csv`, `bootstrap_ci_v5.csv`, `training_history_*.csv`,
   `training_summary_*.csv`, `split_manifest.csv`, `oov_audit_v5.csv`,
-  `gold_kb_bilstm_triage.csv`, `frozen_holdout_false_{negatives,positives}.csv`,
+  `val_probs.csv` (skema `label_id,prob_unsafe` — input ROC BiLSTM paper),
+  `thresholds.json`, `gold_kb_bilstm_triage.csv`,
+  `frozen_holdout_false_{negatives,positives}.csv`,
   `experiment_manifest.json`, kurva ROC/PR/loss/akurasi (tanpa judul figure)
 
 ## Struktur Project

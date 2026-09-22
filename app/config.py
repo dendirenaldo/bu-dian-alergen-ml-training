@@ -83,7 +83,6 @@ class V5Config:
         default_factory=lambda: int(os.getenv("V5_W2V_MIN_COUNT", "1"))
     )
     w2v_epochs: int = 20
-    w2v_seed: int = 42
     embedding_init_scale: float = 0.6
     embed_trainable: bool = True
     mask_zero: bool = field(

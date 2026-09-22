@@ -1,0 +1,10 @@
+{
+  "model_name": "indobenchmark/indobert-base-p1",
+  "seed": 42,
+  "epochs": 4,
+  "lr": 2e-05,
+  "batch_size": 16,
+  "max_len": 256,
+  "train_file": "train_combined.csv",
+  "torch": "2.7.1+cu118"
+}

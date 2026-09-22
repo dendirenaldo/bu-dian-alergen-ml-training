@@ -1,0 +1,11 @@
+{
+  "n_texts": 399,
+  "mean_tokens": 34.8,
+  "median_tokens": 28,
+  "p95_tokens": 79,
+  "padding_rate_at_maxlen_120_pct": 71.0,
+  "hapax_vocab_pct": 36.3,
+  "hapax_token_occurrence_pct": 2.6,
+  "digit_token_types": 128,
+  "source": "artifacts/bert/input/train_real.csv"
+}

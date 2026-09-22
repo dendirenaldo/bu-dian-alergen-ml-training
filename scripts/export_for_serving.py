@@ -32,11 +32,20 @@ import pandas as pd
               help="Threshold fixed (harus sama dengan V5_FIXED_THRESHOLD training).")
 def main(src_dir: str, out_dir: str, eval_csv: str, frozen: str, threshold: float) -> None:
     from app.config import Config
+    from app.core.model.metrics import write_thresholds
 
-    contract = float(Config().v5.fixed_threshold)
-    if float(threshold) != contract:
+    # Kontrak absolut: 0.5. Bukan env-driven, supaya tidak ada jalur
+    # V5_FIXED_THRESHOLD=0.7 yang lolos ke file serving.
+    if float(threshold) != 0.5:
         raise click.UsageError(
-            f"--threshold {threshold} != V5_FIXED_THRESHOLD kontrak ({contract})."
+            f"--threshold {threshold} != kontrak fixed 0.5."
+        )
+    env_contract = float(Config().v5.fixed_threshold)
+    if env_contract != 0.5:
+        click.echo(
+            f"PERINGATAN: V5_FIXED_THRESHOLD={env_contract} != 0.5; "
+            "ekspor tetap memakai 0.5 (kontrak).",
+            err=True,
         )
     os.makedirs(out_dir, exist_ok=True)
 
@@ -64,8 +73,8 @@ def main(src_dir: str, out_dir: str, eval_csv: str, frozen: str, threshold: floa
         pickle.dump(le, f)
     click.echo("  label_encoder.pkl (classes=['safe','unsafe'])")
 
-    with open(os.path.join(out_dir, "thresholds.json"), "w", encoding="utf-8") as f:
-        json.dump({"bilstm": float(threshold), "fixed": True}, f, indent=2)
+    # Melalui write_thresholds -> guard internal threshold 0.5 + skema kanonis.
+    write_thresholds(os.path.join(out_dir, "thresholds.json"), threshold)
     click.echo(f"  thresholds.json (fixed {threshold})")
 
     try:

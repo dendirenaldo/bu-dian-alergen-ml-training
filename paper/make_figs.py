@@ -1,6 +1,7 @@
 """Regenerasi figure publikasi 300 DPI (tanpa judul dalam gambar; caption di naskah)."""
 import json
 import os
+from pathlib import Path
 
 import matplotlib
 matplotlib.use("Agg")
@@ -8,7 +9,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.patches import FancyBboxPatch, FancyArrowPatch
-from sklearn.metrics import auc, confusion_matrix, precision_recall_curve, roc_curve
+from sklearn.metrics import confusion_matrix, precision_recall_curve, roc_curve
+
+# Anchor ke root repo agar skrip jalan dari direktori mana pun
+# (semua path data di bawah bersifat relatif-terhadap-root).
+ROOT = Path(__file__).resolve().parents[1]
+os.chdir(ROOT)
 
 plt.rcParams.update({
     "font.family": "serif", "font.serif": ["DejaVu Serif"],
@@ -122,7 +128,7 @@ fig.savefig(f"{OUT}/fig_training_bilstm.png", dpi=300, bbox_inches="tight")
 plt.close(fig)
 
 # ---------- Gambar: kurva training BERT ----------
-blog = json.load(open("artifacts/bert/bert_hpc_results/training_log.json"))
+blog = json.load(open("artifacts/bert/results/training_log.json"))
 ev = [(e["epoch"], e["eval_loss"], e.get("eval_f1"), e.get("eval_roc_auc"))
       for e in blog if "eval_loss" in e]
 tr = [(e["epoch"], e["loss"]) for e in blog if "loss" in e and "eval_loss" not in e]
@@ -171,17 +177,38 @@ def _probs(path, label_col=None, prob_col="prob_unsafe"):
 
 bp = {"hold": _probs("artifacts/bilstm/output/gold_kb_bilstm_triage.csv", label_col="gold_label"),
       "val": _probs("artifacts/bilstm/output/val_probs.csv", label_col="label_id")}
-roc_bert = json.load(open("artifacts/bert/bert_hpc_results/roc_data.json"))
+roc_bert = json.load(open("artifacts/bert/results/roc_data.json"))
+# AUC BERT dihitung dari roc_data (bukan hardcode label legenda).
+from sklearn.metrics import roc_auc_score as _auc
+AUC_BERT_VAL = _auc(
+    [0] * 25 + [1] * 25,  # placeholder — dihitung dari probs aktual di bawah
+    [0.0] * 50,
+) if False else None  # noqa: E501 — lihat penghitungan di bawah
+_bpv = pd.read_csv("artifacts/bert/results/probs_val.csv")
+_bph = pd.read_csv("artifacts/bert/results/probs_holdout.csv")
+_auc_bert_val = _auc((_bpv["label"].str.lower() == "unsafe").astype(int),
+                     _bpv["prob_unsafe"])
+_auc_bert_hold = _auc((_bph["label"].str.lower() == "unsafe").astype(int),
+                      _bph["prob_unsafe"])
 bval = bp["val"]; bhold = bp["hold"]
 bv_fpr, bv_tpr, _ = roc_curve(bval["y"], bval["p"])
 bh_fpr, bh_tpr, _ = roc_curve(bhold["y"], bhold["p"])
 from sklearn.metrics import roc_auc_score as _auc
+bval = bp["val"]; bhold = bp["hold"]
+bv_fpr, bv_tpr, _ = roc_curve(bval["y"], bval["p"])
+bh_fpr, bh_tpr, _ = roc_curve(bhold["y"], bhold["p"])
+_bpv = pd.read_csv("artifacts/bert/results/probs_val.csv")
+_bph = pd.read_csv("artifacts/bert/results/probs_holdout.csv")
+_auc_bert_val = _auc((_bpv["label"].str.lower() == "unsafe").astype(int),
+                     _bpv["prob_unsafe"])
+_auc_bert_hold = _auc((_bph["label"].str.lower() == "unsafe").astype(int),
+                      _bph["prob_unsafe"])
 fig, axes = plt.subplots(1, 2, figsize=(6.5, 2.9))
 ax = axes[0]
 ax.plot(bv_fpr, bv_tpr, lw=1.8, color=BLUE, label=f"BiLSTM val (AUC={_auc(bval['y'], bval['p']):.3f})")
 ax.plot(bh_fpr, bh_tpr, lw=1.8, color=ORANGE, label=f"BiLSTM holdout (AUC={_auc(bhold['y'], bhold['p']):.3f})")
-ax.plot(roc_bert["val"]["fpr"], roc_bert["val"]["tpr"], lw=1.4, ls="--", color=GREEN, label="BERT val (AUC=0.995)")
-ax.plot(roc_bert["holdout"]["fpr"], roc_bert["holdout"]["tpr"], lw=1.4, ls="--", color=RED, label="BERT holdout (AUC=0.984)")
+ax.plot(roc_bert["val"]["fpr"], roc_bert["val"]["tpr"], lw=1.4, ls="--", color=GREEN, label=f"BERT val (AUC={_auc_bert_val:.3f})")
+ax.plot(roc_bert["holdout"]["fpr"], roc_bert["holdout"]["tpr"], lw=1.4, ls="--", color=RED, label=f"BERT holdout (AUC={_auc_bert_hold:.3f})")
 ax.plot([0, 1], [0, 1], color="gray", lw=0.9, ls=":", label="Acak")
 ax.set_xlabel("False Positive Rate"); ax.set_ylabel("True Positive Rate")
 ax.legend(frameon=True, loc="lower right")
@@ -191,8 +218,8 @@ for name, yy, pp, col, ls in [("BiLSTM val", bval["y"], bval["p"], BLUE, "-"),
                               ("BiLSTM holdout", bhold["y"], bhold["p"], ORANGE, "-")]:
     prec, rec, _ = precision_recall_curve(yy, pp)
     ax.plot(rec, prec, lw=1.6, color=col, ls=ls, label=name)
-bpv = pd.read_csv("artifacts/bert/bert_hpc_results/probs_val.csv")
-bph = pd.read_csv("artifacts/bert/bert_hpc_results/probs_holdout.csv")
+bpv = pd.read_csv("artifacts/bert/results/probs_val.csv")
+bph = pd.read_csv("artifacts/bert/results/probs_holdout.csv")
 for name, df, col in [("BERT val", bpv, GREEN), ("BERT holdout", bph, RED)]:
     yy = (df["label"].str.lower() == "unsafe").astype(int).values
     prec, rec, _ = precision_recall_curve(yy, df["prob_unsafe"].values)
@@ -203,27 +230,14 @@ fig.savefig(f"{OUT}/fig_roc_pr.png", dpi=300, bbox_inches="tight")
 plt.close(fig)
 
 # ---------- Confusion matrices 2x2 ----------
-def _cm_from_triage(path, label_col="gold_label", prob_col="prob_unsafe", thr=0.5):
-    d = pd.read_csv(path)
-    yt = (d[label_col].astype(str).str.lower() == "unsafe").astype(int).values
-    pr = (d[prob_col].astype(float).values >= thr).astype(int)
-    return confusion_matrix(yt, pr, labels=[0, 1])
-
+# _cm_from_probs & _cm_from_triage didefinisikan sekali di atas (triage
+# menyimpan assert anti-UNCLASSIFIED — jangan didefinisikan ulang di sini,
+# atau assert itu menjadi dead code).
 cm_bh = _cm_from_triage("artifacts/bilstm/output/gold_kb_bilstm_triage.csv")
 cm_bv = _cm_from_probs("artifacts/bilstm/output/val_probs.csv")
-cm_tv = _cm_from_probs("artifacts/bert/bert_hpc_results/probs_val.csv")
-cm_th = _cm_from_probs("artifacts/bert/bert_hpc_results/probs_holdout.csv")
+cm_tv = _cm_from_probs("artifacts/bert/results/probs_val.csv")
+cm_th = _cm_from_probs("artifacts/bert/results/probs_holdout.csv")
 
-
-def _cm_from_probs(path, label_col=None, prob_col="prob_unsafe", thr=0.5):
-    d = pd.read_csv(path)
-    lc = label_col or ("label_id" if "label_id" in d.columns else "label")
-    if d[lc].dtype == object:
-        yt = (d[lc].astype(str).str.lower() == "unsafe").astype(int).values
-    else:
-        yt = d[lc].astype(int).values
-    pr = (d[prob_col].astype(float).values >= thr).astype(int)
-    return confusion_matrix(yt, pr, labels=[0, 1])
 fig, axes = plt.subplots(2, 2, figsize=(6.2, 5.2))
 for ax, cm, tag in zip(axes.ravel(),
                        [cm_bv, cm_bh, cm_tv, cm_th],
