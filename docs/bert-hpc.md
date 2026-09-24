@@ -111,3 +111,22 @@ di `scripts/bootstrap_final.py` sebagai pola angka).
 3. Setiap angka di laporan wajib menyebut `n` dan interval kepercayaan.
 4. Klaim "lebih baik" harus menyebut uji di split yang sama + selisih CI
    (bukan selisih point-estimate).
+
+## 6. Menyerahkan Bukti: Training Log dan Video
+
+Ketika diminta bukti "training log" dan "video tahapan training", gunakan:
+
+```powershell
+# Windows (PowerShell), dari root repo — menghasilkan training_run_<stamp>.log
+powershell -ExecutionPolicy Bypass -File .\artifacts\bert\capture_training.ps1
+```
+
+- **Training log** = `training_run_<stamp>.log` (keluaran terminal + timestamp,
+  lengkap dengan header Git commit/seed/perintah) ditambah artefak terstruktur
+  `results_rerun/training_log.json` (metrik per-epoch), `metrics.json`, dan
+  `model_card.json`.
+- **Video**: rekam layar penuh (OBS Studio / Win+G) selama script di atas
+  berjalan — 4-6 menit, satu take tanpa jeda, tunjukkan progres epoch,
+  munculnya `eval_loss/eval_f1`, pesan early stopping, lalu daftar artefak
+  bertimestamp di akhir. Karena seed = 42, metrik run ulang identik dengan
+  run pelaporan.
