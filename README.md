@@ -1,4 +1,4 @@
-# Bu Dian ML Training — BiLSTM Leakage-Safe
+# Allergen Detector ML Training — BiLSTM Leakage-Safe
 
 Pipeline training tunggal: Word2Vec + BiLSTM dengan kontrak leakage-safe
 (frozen holdout, synthetic hanya dari real-train, threshold fixed 0.5).

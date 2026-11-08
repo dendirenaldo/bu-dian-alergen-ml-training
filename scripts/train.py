@@ -16,7 +16,7 @@ from app.config import Config
 @click.group()
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose logging.")
 def cli(verbose: bool) -> None:
-    """Bu Dian Allergen Detection - ML Training CLI."""
+    """Allergen Detector - ML Training CLI."""
     level = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(
         level=level,
