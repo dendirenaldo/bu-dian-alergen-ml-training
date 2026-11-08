@@ -26,7 +26,6 @@ GRAY = "D9D9D9"
 
 doc = Document()
 
-# ---------- halaman & style dasar (identik build_paper.py) ----------
 sec = doc.sections[0]
 sec.page_width, sec.page_height = Cm(21.0), Cm(29.7)
 sec.left_margin = sec.right_margin = Cm(2.5)
@@ -151,7 +150,6 @@ def Fe(x, nd=1):
     return f"{mant.replace('.', ',')}\u00d710{str(int(exp)).translate(sup)}"
 
 
-# ---------- muat artefak (satu-satunya sumber angka) ----------
 cfg = json.load(open(os.path.join(BERT, "model", "config.json"), encoding="utf-8"))
 metrics = json.load(open(os.path.join(BERT, "metrics.json"), encoding="utf-8"))
 card = json.load(open(os.path.join(BERT, "model_card.json"), encoding="utf-8"))
@@ -193,7 +191,6 @@ def errs(df, split):
 
 errs_all = pd.concat([errs(d_v, "Validasi"), errs(d_h, "Himpunan beku")])
 errs_all["nama_produk"] = errs_all.get("nama_produk", pd.Series("", index=errs_all.index))
-# fallback nama: ambil dari split bila kolom kosong
 if errs_all["nama_produk"].fillna("").eq("").any():
     import numpy as _np
     errs_all["nama_produk"] = _np.where(
@@ -218,9 +215,6 @@ def ci_bi_row(split, metric):
 
 eval_bi = pd.read_csv(os.path.join(OUT_BIST, "evaluation_table_v5.csv"))
 
-# ================================================================
-# 4.6 ARSITEKTUR & EVALUASI INDOBERT
-# ================================================================
 h2("4.6  Arsitektur dan Evaluasi Model IndoBERT")
 P(
     "Sub-bab ini menguraikan arsitektur model pembanding berbasis Transformer, "
@@ -422,7 +416,6 @@ caption(
     "Tabel", "4.8",
     "Metrik evaluasi per-epoch pada himpunan validasi (ambang 0,5).",
 )
-# tebalkan baris epoch terbaik (eval_loss minimum)
 for i, e in enumerate(ev, start=1):
     if e["epoch"] == best["epoch"]:
         for cell in t_epoch.rows[i].cells:

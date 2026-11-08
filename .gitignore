@@ -66,6 +66,7 @@ artifacts/bert/input/*.csv
 artifacts/bert/results/model/
 artifacts/bert/results/checkpoints/
 artifacts/bert/results/*.bin
+artifacts/bert/results_2/
 artifacts/bert/results_realonly/
 
 # Training outputs: PNG regenerable di-ignore; CSV audit/triage HARUS

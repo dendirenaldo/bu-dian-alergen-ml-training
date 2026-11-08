@@ -28,7 +28,6 @@ def apply_reproducibility_lock(seed: int = 42) -> dict:
         "CUBLAS_WORKSPACE_CONFIG": ":4096:8",
         "TF_ENABLE_ONEDNN_OPTS": "0",
     }
-    # PYTHONHASHSEED dipaksa (kontrak notebook), sisanya setdefault.
     os.environ["PYTHONHASHSEED"] = str(seed)
     for k, v in env.items():
         os.environ.setdefault(k, v)

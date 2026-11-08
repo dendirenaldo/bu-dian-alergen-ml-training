@@ -3,11 +3,8 @@
   training log lengkap (untuk bukti laporan/skripsi).
 
   Jalankan dari ROOT repo (Windows), misal:
-    cd "D:\Dendi S3\bu-dian-alergen-ml-training"
+    cd bu-dian-alergen-ml-training
     powershell -ExecutionPolicy Bypass -File .\artifacts\bert\capture_training.ps1
-
-  (Jika folder repo Anda masih memakai nama lama "bert_hpc" bukan
-  "artifacts\bert", atur -DataDir .\bert_hpc)
 #>
 param(
   [string]$Python = ".\venv\Scripts\python.exe",

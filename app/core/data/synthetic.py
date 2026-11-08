@@ -49,7 +49,6 @@ def generate_synthetic_dataset(
         parts = re.split(r"[,;.!\n]+", str(text))
         return [_normalize(p) for p in parts if len(_normalize(p)) >= 3]
 
-    # Common pool: frasa train yang KB-safe.
     common_pool: set[str] = set()
     for text in train_texts:
         for part in split_ingredients(text):
@@ -62,7 +61,6 @@ def generate_synthetic_dataset(
     ])
     common_pool = sorted(common_pool)
 
-    # Allergen seeds per kategori dari train.
     seeds: dict[str, set[str]] = {cat: set() for cat in ALLERGEN_KB}
     for text in train_texts:
         result = rule_based_kb_label(text)

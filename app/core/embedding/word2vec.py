@@ -76,9 +76,6 @@ def build_embedding_matrix(
         Tuple of (embedding_matrix, num_words, hit_count).
     """
     num_words = min(vocab_size, len(word_index) + 1)
-    # FIX: init OOV kecil (scale 0.1, bukan 0.6) agar vektor acak tidak
-    # mendominasi vektor Word2Vec terlatih (norm ~0.1-1.0). Seed agar stabil.
-    # V5 parity memakai scale 0.6 persis seperti notebook.
     rng = np.random.RandomState(seed)
     embedding_matrix = rng.normal(scale=init_scale, size=(num_words, embed_dim)).astype(
         np.float32

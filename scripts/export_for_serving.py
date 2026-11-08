@@ -34,8 +34,6 @@ def main(src_dir: str, out_dir: str, eval_csv: str, frozen: str, threshold: floa
     from app.config import Config
     from app.core.model.metrics import write_thresholds
 
-    # Kontrak absolut: 0.5. Bukan env-driven, supaya tidak ada jalur
-    # V5_FIXED_THRESHOLD=0.7 yang lolos ke file serving.
     if float(threshold) != 0.5:
         raise click.UsageError(
             f"--threshold {threshold} != kontrak fixed 0.5."
@@ -53,7 +51,6 @@ def main(src_dir: str, out_dir: str, eval_csv: str, frozen: str, threshold: floa
         "bilstm_word2vec_v5.keras": "bilstm_model.keras",
         "word2vec_v5.model": "word2vec.model",
         "tokenizer_v5.pkl": "tokenizer.pkl",
-        # JSON adalah jalur load utama registry (pickle lintas repo rapuh).
         "tokenizer_bilstm_v5.json": "tokenizer_bilstm.json",
     }
     for src_name, dst_name in renames.items():
@@ -63,7 +60,6 @@ def main(src_dir: str, out_dir: str, eval_csv: str, frozen: str, threshold: floa
         shutil.copy2(src, os.path.join(out_dir, dst_name))
         click.echo(f"  {src_name} -> {dst_name}")
 
-    # LabelEncoder fixed (konsisten dengan label_id training).
     from sklearn.preprocessing import LabelEncoder
 
     le = LabelEncoder()
@@ -73,7 +69,6 @@ def main(src_dir: str, out_dir: str, eval_csv: str, frozen: str, threshold: floa
         pickle.dump(le, f)
     click.echo("  label_encoder.pkl (classes=['safe','unsafe'])")
 
-    # Melalui write_thresholds -> guard internal threshold 0.5 + skema kanonis.
     write_thresholds(os.path.join(out_dir, "thresholds.json"), threshold)
     click.echo(f"  thresholds.json (fixed {threshold})")
 

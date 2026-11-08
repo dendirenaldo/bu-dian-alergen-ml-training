@@ -151,7 +151,6 @@ def rule_based_kb_label(text: Any) -> dict:
     methods: list[str] = []
     noncanonical_hits: list[str] = []
 
-    # Exact / synonym per kategori (satu hit per kategori).
     for category, info in ALLERGEN_KB.items():
         terms = sorted(set(info["canonical"] + info["synonyms"]), key=len, reverse=True)
         for term in terms:
@@ -160,7 +159,6 @@ def rule_based_kb_label(text: Any) -> dict:
                 methods.append("exact/synonym")
                 break
 
-    # Fuzzy konservatif per kategori yang belum kena.
     candidate_phrases = re.split(r"[,;.()\n]+", raw)
     candidate_phrases = [clean_kb_text(x) for x in candidate_phrases if clean_kb_text(x)]
     for category, info in ALLERGEN_KB.items():

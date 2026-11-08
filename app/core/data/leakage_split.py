@@ -177,7 +177,6 @@ def run_v5_split(
         if missing:
             raise ValueError(f"Frozen holdout tidak ditemukan di data: {sorted(missing)[:10]}")
         holdout_row_idx = sorted(df.index[df["_product_key_v5"].isin(frozen_keys)].tolist())
-        # Perluas ke komponen penuh + cek konflik.
         holdout_cids = {int(df.loc[i, "leakage_component_id"]) for i in holdout_row_idx}
         expanded = sorted({i for cid in holdout_cids for i in comp_lookup[cid]["rows"]})
         expanded_keys = {df.loc[i, "_product_key_v5"] for i in expanded}
@@ -255,10 +254,7 @@ def audit_split_no_leakage(
     ]:
         frames = {"train": df_train, "val": df_val, "holdout": df_holdout}
         overlap = _set(frames[a_name], col) & _set(frames[b_name], col)
-        # Hash teks kosong (teks kosong) diabaikan bila keduanya kosong? teks kosong
-        # sudah dibuang saat merge, tapi tetap: abaikan string kosong.
         overlap = {x for x in overlap if x}
-        # Untuk group: string kosong juga abaikan.
         rows.append({
             "comparison": label,
             "overlap": len(overlap),

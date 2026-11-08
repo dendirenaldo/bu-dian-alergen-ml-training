@@ -15,7 +15,6 @@ GRAY = "D9D9D9"
 
 doc = Document()
 
-# ---------- halaman & style dasar ----------
 sec = doc.sections[0]
 sec.page_width, sec.page_height = Cm(21.0), Cm(29.7)
 sec.left_margin = sec.right_margin = Cm(2.5)
@@ -170,7 +169,6 @@ def F(x, nd=4):
     return s.replace(".", ",")
 
 
-# ================= JUDUL =================
 t = doc.add_paragraph()
 t.alignment = WD_ALIGN_PARAGRAPH.CENTER
 r = t.add_run("Deteksi Alergen pada Komposisi Produk Pangan Kemasan Menggunakan "
@@ -180,7 +178,6 @@ doc.add_paragraph()
 add_toc()
 add_page_numbers()
 
-# ================= 3. METODOLOGI =================
 h1("3.  METODOLOGI PENELITIAN")
 P("Penelitian ini dirancang sebagai penelitian eksperimental komparatif untuk menjawab dua pertanyaan utama. ",
   ("Pertama", True), ", seberapa akurat model Word2Vec–BiLSTM yang dilatih dengan protokol anti-leakage dalam mengklasifikasikan teks komposisi produk pangan sebagai aman (",
@@ -334,7 +331,6 @@ P("Evaluasi memakai akurasi, presisi, recall, dan skor-F1 kelas tidak aman, dile
   "bahkan KB pun salah, tanpa menyetel apa pun dari himpunan beku.")
 equation(f"{FIG}/eq_f1.png", 4)
 
-# ================= 4. HASIL DAN PEMBAHASAN =================
 h1("4.  HASIL DAN PEMBAHASAN")
 
 h2("4.1  Pengumpulan Data")

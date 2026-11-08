@@ -32,7 +32,6 @@ def preprocess_image(path: str) -> np.ndarray:
     gray = cv2.bilateralFilter(gray, 5, 75, 75)
     _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-    # Normalize foreground/background for more stable OCR
     if np.mean(thresh) < 127:
         thresh = 255 - thresh
 

@@ -58,7 +58,6 @@ def save_training_curves_v5(
     plt.plot(hist["accuracy"], linewidth=2, label="Train Accuracy")
     if "val_accuracy" in hist.columns:
         plt.plot(hist["val_accuracy"], linewidth=2, label="Validation Accuracy")
-    # Judul figure dihapus: caption ditulis di dokumen Word.
     plt.xlabel("Epoch")
     plt.ylabel("Accuracy")
     plt.grid(True, alpha=0.3)
@@ -71,7 +70,6 @@ def save_training_curves_v5(
     plt.plot(hist["loss"], linewidth=2, label="Train Loss")
     if "val_loss" in hist.columns:
         plt.plot(hist["val_loss"], linewidth=2, label="Validation Loss")
-    # Judul figure dihapus: caption ditulis di dokumen Word.
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
     plt.grid(True, alpha=0.3)
@@ -91,7 +89,6 @@ def save_training_curves_v5(
     ]:
         if col in hist.columns:
             plt.plot(hist[col], linewidth=2, label=label)
-    # Judul figure dihapus: caption ditulis di dokumen Word.
     plt.xlabel("Epoch")
     plt.ylabel("Score")
     plt.grid(True, alpha=0.3)
@@ -197,7 +194,6 @@ def plot_roc_pr_v5(
         plt.plot(fpr_v, tpr_v, linewidth=2, label=f"Validation ROC-AUC = {auc_v:.4f}")
         plt.plot(fpr_h, tpr_h, linewidth=2, label=f"Frozen Holdout ROC-AUC = {auc_h:.4f}")
         plt.plot([0, 1], [0, 1], linestyle="--", linewidth=1, label="Random")
-        # Judul figure dihapus: caption ditulis di dokumen Word.
         plt.xlabel("False Positive Rate")
         plt.ylabel("True Positive Rate")
         plt.grid(True, alpha=0.3)
@@ -213,7 +209,6 @@ def plot_roc_pr_v5(
         plt.figure(figsize=(8, 6), dpi=120)
         plt.plot(r_v, p_v, linewidth=2, label=f"Validation AP = {ap_v:.4f}")
         plt.plot(r_h, p_h, linewidth=2, label=f"Frozen Holdout AP = {ap_h:.4f}")
-        # Judul figure dihapus: caption ditulis di dokumen Word.
         plt.xlabel("Recall")
         plt.ylabel("Precision")
         plt.grid(True, alpha=0.3)
@@ -222,8 +217,6 @@ def plot_roc_pr_v5(
         plt.savefig(os.path.join(output_dir, f"pr_curve_{prefix}.png"))
         plt.close()
     else:
-        # ROC/PR adalah audit wajib (pilar 7): single-class = run gagal,
-        # bukan diam-diam di-skip (kontrak split butuh kedua kelas).
         val_cls = len(np.unique(np.asarray(y_val)))
         hold_cls = len(np.unique(np.asarray(y_holdout)))
         raise ValueError(
@@ -266,7 +259,6 @@ def plot_confusion_v5(
         plt.xticks([0, 1], ["safe", "unsafe"])
         plt.yticks([0, 1], ["safe", "unsafe"])
         plt.colorbar()
-    # Judul figure dihapus: caption ditulis di dokumen Word.
     plt.xlabel("Predicted")
     plt.ylabel("Actual")
     plt.tight_layout()

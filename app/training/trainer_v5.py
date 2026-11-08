@@ -64,7 +64,6 @@ def _load_frozen_products(config: Config, n_real: int) -> tuple[list[str] | None
 
 def run_v5_parity(config: Config | None = None) -> dict:
     """Jalankan pipeline V5 parity end-to-end. Butuh TF + Gensim terinstal."""
-    # 1. Repro lock SEBELUM import TF (kontrak notebook Cell 1).
     from app.repro import apply_reproducibility_lock, seed_all
 
     if config is None:
@@ -87,7 +86,6 @@ def run_v5_parity(config: Config | None = None) -> dict:
     assert v5.fixed_threshold == 0.50, "V5 threshold harus fixed 0.50."
     assert v5.synthetic_source_contract == "real_train_only"
 
-    # 2. Load data CSV tunggal -> model_source (label CSV = gold).
     from app.core.data.gold_merge import (
         build_model_source_from_single,
         standardize_columns,
@@ -111,13 +109,11 @@ def run_v5_parity(config: Config | None = None) -> dict:
                 df_model_source["group_key"].nunique())
     logger.info("Gold distribution:\n%s", df_model_source["gold_label"].value_counts())
 
-    # 3. KB vs Gold audit (diagnostik).
     from app.core.model.audit import kb_vs_gold_audit
 
     kb_audit = kb_vs_gold_audit(df_model_source)
     logger.info("KB vs Gold:\n%s", kb_audit["summary"].to_string(index=False))
 
-    # 4. Split leakage-safe.
     from app.core.data.leakage_split import (
         audit_split_no_leakage,
         build_split_manifest,
@@ -145,7 +141,6 @@ def run_v5_parity(config: Config | None = None) -> dict:
     manifest_path = os.path.join(config.output_dir, "split_manifest.csv")
     manifest.to_csv(manifest_path, index=False)
 
-    # 5. Synthetic (real-train only) + final pool + audit.
     from app.core.data.synthetic import build_final_training_pool, generate_synthetic_dataset
     from app.core.data.leakage_split import audit_final_pool_no_leakage
 
@@ -163,14 +158,12 @@ def run_v5_parity(config: Config | None = None) -> dict:
                 len(y_train), len(df_real_train), len(df_sintesis),
                 len(y_val), len(y_holdout))
 
-    # 6. Tokenizer + Word2Vec fit HANYA final-train (re-seed dulu).
     seed_all(config.seed)
     from app.core.model.tokenizer import Tokenizer
     from app.core.embedding.word2vec import build_embedding_matrix, train_word2vec
     from app.core.preprocessing.text import fold_digits_v5, simple_tokenize
 
     if v5.digit_fold:
-        # Diterapkan ke SEMUA split sebelum tokenisasi (konsisten, tak bocor).
         X_train_text = [fold_digits_v5(t) for t in X_train_text]
         X_val_text = [fold_digits_v5(t) for t in X_val_text]
         X_holdout_text = [fold_digits_v5(t) for t in X_holdout_text]
@@ -213,7 +206,6 @@ def run_v5_parity(config: Config | None = None) -> dict:
     oov_table.to_csv(os.path.join(config.output_dir, "oov_audit_v5.csv"), index=False)
     logger.info("OOV:\n%s", oov_table.to_string(index=False))
 
-    # 7. Build + train BiLSTM fixed (re-seed; holdout TIDAK PERNAH ke fit).
     seed_all(config.seed)
     import tensorflow as tf2
     from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
@@ -246,7 +238,6 @@ def run_v5_parity(config: Config | None = None) -> dict:
     assert HOLDOUT_USED_IN_MODEL_FIT is False
     assert TRAIN_SHUFFLE is False
 
-    # 8. Evaluasi fixed threshold + artefak.
     from app.core.model.audit import (
         audit_final_config_v5,
         audit_pipeline_consistency_v5,
@@ -269,8 +260,6 @@ def run_v5_parity(config: Config | None = None) -> dict:
                              TRAIN_SHUFFLE, v5.fixed_threshold,
                              holdout_size=len(y_holdout),
                              expected_holdout_size=v5.holdout_size)
-    # Audit konfigurasi final (LR/clip/mask/min_count/preshuffle/digit_fold/
-    # split) — gagal keras bila env override menyimpang dari kontrak.
     final_config = audit_final_config_v5(v5)
 
     val_prob = model.predict(X_val_pad, verbose=0).ravel()
@@ -304,8 +293,6 @@ def run_v5_parity(config: Config | None = None) -> dict:
                "final_config": final_config},
     )
 
-    # 9. Simpan model + artefak. Alias serving (bilstm_model.keras) HANYA
-    # ditulis oleh scripts/export_for_serving.py, bukan trainer.
     os.makedirs(config.model_dir, exist_ok=True)
     model.save(os.path.join(config.model_dir, "bilstm_word2vec_v5.keras"))
     try:
@@ -315,8 +302,6 @@ def run_v5_parity(config: Config | None = None) -> dict:
     with open(os.path.join(config.model_dir, "tokenizer_v5.pkl"), "wb") as f:
         pickle.dump(tokenizer, f)
     tokenizer.save_json(os.path.join(config.model_dir, "tokenizer_bilstm_v5.json"))
-    # Threshold kanonis tunggal (tidak ada lagi thresholds_v5.json ganda
-    # atau key "lstm" fiktif).
     write_thresholds(os.path.join(config.output_dir, "thresholds.json"),
                      v5.fixed_threshold)
     write_thresholds(os.path.join(config.model_dir, "thresholds.json"),

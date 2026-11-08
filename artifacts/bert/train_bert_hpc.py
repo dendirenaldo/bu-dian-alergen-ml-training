@@ -92,8 +92,6 @@ def compute_eval_metrics(eval_pred):
 
 
 def main():
-    # Senyapkan warning kosmetik internal HF Trainer (agregasi loss skalar).
-    # Tidak memengaruhi bobot/hasil.
     warnings.filterwarnings(
         "ignore", message="Was asked to gather along dimension 0.*")
     ap = argparse.ArgumentParser()
@@ -133,8 +131,6 @@ def main():
     tr_y = train_df["label"].str.lower().map(LABEL2ID).astype(int).tolist()
     va_y = val_df["label"].str.lower().map(LABEL2ID).astype(int).tolist()
 
-    # Peta label eksplisit: menimpa id2label basi (5 label) bawaan config
-    # IndoBERT sekaligus membuat artefak model/ bersih untuk serving.
     model = AutoModelForSequenceClassification.from_pretrained(
         args.model_name, num_labels=2,
         id2label={0: "safe", 1: "unsafe"},
@@ -157,14 +153,10 @@ def main():
         seed=args.seed,
         logging_steps=50,
     )
-    # --- kompatibilitas lintas versi transformers ---
-    # transformers lama memakai 'evaluation_strategy', bukan 'eval_strategy'.
     if "eval_strategy" in _TA_PARAMS:
         ta_kwargs["eval_strategy"] = "epoch"
     else:
         ta_kwargs["evaluation_strategy"] = "epoch"
-    # 'warmup_ratio' tidak ada di transformers lama -> hitung warmup_steps
-    # manual (±10% total step). Bila keduanya tak ada, abaikan warmup.
     if "warmup_ratio" in _TA_PARAMS:
         ta_kwargs["warmup_ratio"] = 0.1
     elif "warmup_steps" in _TA_PARAMS:
@@ -184,7 +176,6 @@ def main():
     )
     trainer.train()
 
-    # Riwayat log per-epoch (loss/train + eval_*) untuk kurva skripsi.
     with open(os.path.join(args.output_dir, "training_log.json"), "w") as f:
         json.dump(trainer.state.log_history, f, indent=2, default=float)
 
@@ -193,7 +184,6 @@ def main():
         y = df["label"].str.lower().map(LABEL2ID).astype(int).tolist()
         out = trainer.predict(TextDataset(enc, y))
         logits = out.predictions
-        # softmax biner -> prob kelas unsafe (id=1)
         m = logits.max(axis=1, keepdims=True)
         e = np.exp(logits - m)
         return np.asarray(y), (e / e.sum(axis=1, keepdims=True))[:, 1]

@@ -41,7 +41,6 @@ class V5Config:
     D1 clip=1.0, D2 LR=1e-4, D3 mask_zero=True.
     """
 
-    # --- Split contract (50 real holdout + 50 real val, 25/25) ---
     holdout_size: int = field(
         default_factory=lambda: int(os.getenv("V5_HOLDOUT_SIZE", "50"))
     )
@@ -55,24 +54,19 @@ class V5Config:
     val_unsafe: int = field(
         default_factory=lambda: int(os.getenv("V5_VAL_UNSAFE", "25"))
     )
-    # Path JSON frozen holdout. None -> default notebook23 bila n=114,
-    # re-derive deterministik bila n!=114 (lalu freeze hasilnya).
     frozen_holdout_path: str | None = field(
         default_factory=lambda: os.getenv("V5_FROZEN_HOLDOUT_PATH") or None
     )
 
-    # --- Synthetic (HANYA dari real-train) ---
     synthetic_total: int = field(
         default_factory=lambda: int(os.getenv("V5_SYNTHETIC_TOTAL", "1000"))
     )
     synthetic_source_contract: str = "real_train_only"
 
-    # --- Threshold FIXED (never tuned; assert 0.5 di trainer) ---
     fixed_threshold: float = field(
         default_factory=lambda: float(os.getenv("V5_FIXED_THRESHOLD", "0.5"))
     )
 
-    # --- NLP ---
     vocab_size: int = 20000
     max_len: int = field(
         default_factory=lambda: int(os.getenv("V5_MAX_LEN", "120"))
@@ -92,7 +86,6 @@ class V5Config:
         default_factory=lambda: _env_flag("V5_DIGIT_FOLD", "0")
     )
 
-    # --- Model (single-run, no tuning) ---
     lstm_units_1: int = 128
     lstm_units_2: int = 64
     dropout_1: float = 0.3
@@ -113,8 +106,6 @@ class V5Config:
     lr_reduce_factor: float = 0.5
     min_lr: float = 1e-6
     train_shuffle: bool = False
-    # Pre-shuffle deterministik SEKALI sebelum fit (campur blok real‖synthetic,
-    # tetap reproducible via RandomState(seed)). Off = parity notebook.
     preshuffle: bool = field(
         default_factory=lambda: _env_flag("V5_SHUFFLE", "0")
     )
@@ -122,7 +113,6 @@ class V5Config:
         default_factory=_parse_clip_norm
     )
 
-    # --- Kolom CSV sumber ---
     product_col: str = field(
         default_factory=lambda: os.getenv("V5_PRODUCT_COL", "nama_produk")
     )
@@ -143,7 +133,6 @@ class Config:
     csv_encoding: str = field(
         default_factory=lambda: os.getenv("CSV_ENCODING", "utf-8")
     )
-    # Kolom CSV mentah (dipetakan ke kolom V5 di trainer bila beda).
     text_col: str = field(default_factory=lambda: os.getenv("TEXT_COL", "text"))
     label_col: str = field(default_factory=lambda: os.getenv("LABEL_COL", "label"))
 

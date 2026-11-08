@@ -40,7 +40,6 @@ def parse_composition_from_layout(path: str, processed_img: np.ndarray) -> str:
 
     anchors = [ln for ln in lines if anchor_pattern.search(ln["text"])]
     if not anchors:
-        # Fallback: use full OCR text
         full_text = pytesseract.image_to_string(processed_img, lang="eng")
         return normalize_text(full_text)
 
@@ -56,7 +55,6 @@ def parse_composition_from_layout(path: str, processed_img: np.ndarray) -> str:
         if ln["top"] < anchor["top"]:
             continue
 
-        # Start when anchor line is found
         if not started and ln is anchor:
             started = True
             selected.append(ln["text"])
@@ -66,11 +64,9 @@ def parse_composition_from_layout(path: str, processed_img: np.ndarray) -> str:
         if not started:
             continue
 
-        # Stop if vertical gap is too large
         if prev_bottom is not None and (ln["top"] - prev_bottom) > max_gap:
             break
 
-        # Prefer lines in the same horizontal area as anchor
         horizontal_overlap = not (
             ln["right"] < anchor["left"] - 100 or ln["left"] > anchor["right"] + 900
         )

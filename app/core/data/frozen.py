@@ -20,7 +20,6 @@ import os
 
 logger = logging.getLogger(__name__)
 
-# Nama env anti-tamper. Bila diset, hash daftar frozen WAJIB cocok.
 FROZEN_SHA_ENV = "V5_FROZEN_SHA256"
 
 

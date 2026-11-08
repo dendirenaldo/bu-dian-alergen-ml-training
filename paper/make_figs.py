@@ -11,8 +11,6 @@ import pandas as pd
 from matplotlib.patches import FancyBboxPatch, FancyArrowPatch
 from sklearn.metrics import confusion_matrix, precision_recall_curve, roc_curve
 
-# Anchor ke root repo agar skrip jalan dari direktori mana pun
-# (semua path data di bawah bersifat relatif-terhadap-root).
 ROOT = Path(__file__).resolve().parents[1]
 os.chdir(ROOT)
 
@@ -26,7 +24,6 @@ OUT = "paper_figs"
 os.makedirs(OUT, exist_ok=True)
 BLUE, ORANGE, GREEN, RED, PURPLE = "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd"
 
-# ---------- Gambar: distribusi label ----------
 fig, axes = plt.subplots(1, 2, figsize=(6.5, 2.6))
 cats = ["safe", "unsafe"]
 real = [248, 251]
@@ -53,7 +50,6 @@ fig.tight_layout(pad=1.2)
 fig.savefig(f"{OUT}/fig_distribusi_label.png", dpi=300, bbox_inches="tight")
 plt.close(fig)
 
-# ---------- Gambar: diagram alir metodologi ----------
 stages = [
     ("Studi\nLiteratur", None),
     ("Pengumpulan\nData", "foto kemasan +\nteks komposisi"),
@@ -83,7 +79,6 @@ fig.tight_layout(pad=0.4)
 fig.savefig(f"{OUT}/fig_diagram_metodologi.png", dpi=300, bbox_inches="tight")
 plt.close(fig)
 
-# ---------- Gambar: arsitektur BiLSTM ----------
 layers = [("Input\n(indeks kata)\nmax_len=120", 1.15), ("Embedding\nWord2Vec\n100-dim", 1.15),
           ("BiLSTM\n128 unit", 1.0), ("Dropout\n0,3", 0.7), ("BiLSTM\n64 unit", 1.0),
           ("Dropout\n0,3", 0.7), ("Dense\n64, ReLU", 0.95), ("Dropout\n0,2", 0.7),
@@ -104,7 +99,6 @@ fig.tight_layout(pad=0.4)
 fig.savefig(f"{OUT}/fig_arsitektur_bilstm.png", dpi=300, bbox_inches="tight")
 plt.close(fig)
 
-# ---------- Gambar: kurva training BiLSTM ----------
 h = pd.read_csv("artifacts/bilstm/output/training_history_bilstm_word2vec_leakage_safe.csv")
 summ = pd.read_csv("artifacts/bilstm/output/training_summary_bilstm_word2vec_leakage_safe.csv").iloc[0]
 BEST_EP = int(summ["best_epoch"])
@@ -127,7 +121,6 @@ fig.tight_layout(pad=1.0)
 fig.savefig(f"{OUT}/fig_training_bilstm.png", dpi=300, bbox_inches="tight")
 plt.close(fig)
 
-# ---------- Gambar: kurva training BERT ----------
 blog = json.load(open("artifacts/bert/results/training_log.json"))
 ev = [(e["epoch"], e["eval_loss"], e.get("eval_f1"), e.get("eval_roc_auc"))
       for e in blog if "eval_loss" in e]
@@ -147,7 +140,6 @@ fig.tight_layout(pad=1.0)
 fig.savefig(f"{OUT}/fig_training_bert.png", dpi=300, bbox_inches="tight")
 plt.close(fig)
 
-# ---------- ROC + PR ----------
 def _cm_from_probs(path, label_col=None, prob_col="prob_unsafe", thr=0.5):
     d = pd.read_csv(path)
     lc = label_col or ("label_id" if "label_id" in d.columns else "label")
@@ -178,7 +170,6 @@ def _probs(path, label_col=None, prob_col="prob_unsafe"):
 bp = {"hold": _probs("artifacts/bilstm/output/gold_kb_bilstm_triage.csv", label_col="gold_label"),
       "val": _probs("artifacts/bilstm/output/val_probs.csv", label_col="label_id")}
 roc_bert = json.load(open("artifacts/bert/results/roc_data.json"))
-# AUC BERT dihitung dari roc_data (bukan hardcode label legenda).
 from sklearn.metrics import roc_auc_score as _auc
 AUC_BERT_VAL = _auc(
     [0] * 25 + [1] * 25,  # placeholder — dihitung dari probs aktual di bawah
@@ -212,7 +203,6 @@ ax.plot(roc_bert["holdout"]["fpr"], roc_bert["holdout"]["tpr"], lw=1.4, ls="--",
 ax.plot([0, 1], [0, 1], color="gray", lw=0.9, ls=":", label="Acak")
 ax.set_xlabel("False Positive Rate"); ax.set_ylabel("True Positive Rate")
 ax.legend(frameon=True, loc="lower right")
-# PR
 ax = axes[1]
 for name, yy, pp, col, ls in [("BiLSTM val", bval["y"], bval["p"], BLUE, "-"),
                               ("BiLSTM holdout", bhold["y"], bhold["p"], ORANGE, "-")]:
@@ -229,10 +219,6 @@ fig.tight_layout(pad=1.0)
 fig.savefig(f"{OUT}/fig_roc_pr.png", dpi=300, bbox_inches="tight")
 plt.close(fig)
 
-# ---------- Confusion matrices 2x2 ----------
-# _cm_from_probs & _cm_from_triage didefinisikan sekali di atas (triage
-# menyimpan assert anti-UNCLASSIFIED — jangan didefinisikan ulang di sini,
-# atau assert itu menjadi dead code).
 cm_bh = _cm_from_triage("artifacts/bilstm/output/gold_kb_bilstm_triage.csv")
 cm_bv = _cm_from_probs("artifacts/bilstm/output/val_probs.csv")
 cm_tv = _cm_from_probs("artifacts/bert/results/probs_val.csv")
@@ -258,7 +244,6 @@ fig.tight_layout(pad=1.4)
 fig.savefig(f"{OUT}/fig_confusion.png", dpi=300, bbox_inches="tight")
 plt.close(fig)
 
-# ---------- Persamaan (render mathtext) ----------
 eqs = {
     "eq_lstm": r"$f_t=\sigma(W_f[h_{t-1},x_t]+b_f),\; i_t=\sigma(W_i[h_{t-1},x_t]+b_i),\; o_t=\sigma(W_o[h_{t-1},x_t]+b_o)$"
                "\n" r"$\tilde{C}_t=\tanh(W_C[h_{t-1},x_t]+b_C),\; C_t=f_t \odot C_{t-1}+i_t \odot \tilde{C}_t,\; h_t=o_t \odot \tanh(C_t)$",

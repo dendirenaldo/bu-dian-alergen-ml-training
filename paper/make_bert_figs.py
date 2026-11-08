@@ -30,9 +30,6 @@ OUT = ROOT / "paper_figs"
 OUT.mkdir(exist_ok=True)
 BLUE, ORANGE, GREEN, RED, PURPLE = "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd"
 
-# ============================================================
-# 1. Diagram arsitektur end-to-end (Gambar 4.6)
-# ============================================================
 stages = [
     ("Teks komposisi\n(mentah)", "", "#EFEFEF"),
     ("Tokenisasi\nWordPiece", "vocab 50 rb\npotong/pad 256", "#DCE9F7"),
@@ -59,7 +56,6 @@ for i, (title, sub, fc) in enumerate(stages):
                                      (x0 + bw + gap, 1.05 + bh / 2),
                                      arrowstyle="-|>", mutation_scale=11,
                                      linewidth=1.3, color="black"))
-# satu baris anotasi di tengah bawah (tanpa tumpang tindih)
 ax.annotate(
     "max_length = 256 token  ·  12 layer · hidden 768 · 12 kepala · posisi ≤ 512"
     "  ·  label: 0 = safe, 1 = unsafe",
@@ -69,9 +65,6 @@ fig.tight_layout(pad=0.4)
 fig.savefig(OUT / "bert_diagram.png", dpi=300, bbox_inches="tight")
 plt.close(fig)
 
-# ============================================================
-# 2. Kurva pelatihan (Gambar 4.7)
-# ============================================================
 blog = json.load(open("artifacts/bert/results/training_log.json"))
 ev = [(e["epoch"], e["eval_loss"], e["eval_f1"], e["eval_roc_auc"],
        e["eval_precision"], e["eval_recall"]) for e in blog if "eval_loss" in e]
@@ -106,9 +99,6 @@ fig.tight_layout(pad=1.0)
 fig.savefig(OUT / "bert_training.png", dpi=300, bbox_inches="tight")
 plt.close(fig)
 
-# ============================================================
-# 3. Matriks konfusi 1×2 (Gambar 4.8)
-# ============================================================
 def cm_from(path, label_col):
     d = pd.read_csv(path)
     if d[label_col].dtype == object:
@@ -137,9 +127,6 @@ fig.tight_layout(pad=1.2)
 fig.savefig(OUT / "bert_confusion.png", dpi=300, bbox_inches="tight")
 plt.close(fig)
 
-# ============================================================
-# 4. ROC + PR BERT (Gambar 4.9)
-# ============================================================
 d_v = pd.read_csv("artifacts/bert/results/probs_val.csv")
 d_h = pd.read_csv("artifacts/bert/results/probs_holdout.csv")
 y_v = (d_v["label"].str.lower() == "unsafe").astype(int).values
@@ -167,9 +154,6 @@ fig.tight_layout(pad=1.0)
 fig.savefig(OUT / "bert_roc_pr.png", dpi=300, bbox_inches="tight")
 plt.close(fig)
 
-# ============================================================
-# 5. Persamaan (5) softmax, (6) AUC
-# ============================================================
 eqs = {
     "bert_eq_softmax": r"$p(y=j \mid \mathbf{z}) = \dfrac{\exp(z_j)}{\sum_{k=0}^{1} \exp(z_k)}, \quad j \in \{0,1\}$",
     "bert_eq_ce": r"$\mathcal{L}_{\mathrm{CE}} = -\dfrac{1}{N}\sum_{i=1}^{N} \log\, p\!\left(y_i \mid \mathbf{z}_i\right)$",

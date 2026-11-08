@@ -32,7 +32,6 @@ def main(csv_input: str | None, frozen_holdout: str | None,
          output_dir: str | None, model_dir: str | None) -> None:
     config = Config()
     v5 = config.v5
-    # Repro lock SEBELUM import TF (kontrak determinisme, sama dengan trainer).
     from app.repro import apply_reproducibility_lock, seed_all
 
     apply_reproducibility_lock(config.seed)
@@ -52,7 +51,6 @@ def main(csv_input: str | None, frozen_holdout: str | None,
     text_src = config.text_col if config.text_col in df_raw.columns else v5.text_col
     df_model_source = build_model_source_from_single(
         df_raw, product_col=v5.product_col, text_col=text_src)
-    # Melalui load_frozen_products -> hash V5_FROZEN_SHA256 selalu divalidasi.
     from app.core.data.frozen import load_frozen_products
 
     frozen, frozen_sha = load_frozen_products(frozen_path)

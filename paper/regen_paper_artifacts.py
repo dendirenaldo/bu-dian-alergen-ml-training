@@ -69,7 +69,6 @@ def _run(csv_input: str) -> None:
     config = Config()
     os.makedirs(OUT, exist_ok=True)
 
-    # 1. KB vs Gold (n=499) dari CSV kanonis.
     df_raw = pd.read_csv(csv_input, delimiter=config.csv_delimiter,
                          encoding=config.csv_encoding)
     df_raw = standardize_columns(df_raw, product_col=config.v5.product_col)
@@ -84,7 +83,6 @@ def _run(csv_input: str) -> None:
     print("KB vs Gold (499):")
     print(kb["summary"].to_string(index=False))
 
-    # 2. Statistik token pada teks latih riil (399).
     train_real = pd.read_csv(TRAIN_REAL)
     stats = token_stats(train_real["text"].fillna("").astype(str).tolist())
     stats["source"] = TRAIN_REAL
@@ -93,7 +91,6 @@ def _run(csv_input: str) -> None:
         json.dump(stats, f, indent=2)
     print("Token stats (399 real-train):", json.dumps(stats, indent=2))
 
-    # 3. CI bootstrap BERT (seed=42 -> identik dengan angka di naskah).
     rows = []
     for name in ("val", "holdout"):
         d = pd.read_csv(f"artifacts/bert/results/probs_{name}.csv")

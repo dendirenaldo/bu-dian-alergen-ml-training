@@ -10,7 +10,6 @@ from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 logger = logging.getLogger(__name__)
 
-# ID 0 = PAD, ID 1 = OOV ("<OOV>"). Jangan dipakai untuk kata lain.
 PAD_ID = 0
 OOV_ID = 1
 
@@ -91,7 +90,6 @@ class Tokenizer:
         """Return the effective vocabulary size (capped by vocab_size)."""
         return min(self.vocab_size, len(self._tokenizer.word_index) + 1)
 
-    # -- Persistensi dual-model: JSON vocab (portabel) + pickle legacy --
     def get_config(self) -> dict:
         """Return serializable config (vocab + params) untuk save JSON."""
         return {
@@ -114,10 +112,8 @@ class Tokenizer:
         with open(path, encoding="utf-8") as f:
             cfg = json.load(f)
         tok = cls(vocab_size=cfg["vocab_size"], max_len=cfg["max_len"])
-        # Rekonstruksi Keras Tokenizer dari word_index tersimpan.
         tok._tokenizer.fit_on_texts([])  # inisialisasi struktur internal
         tok._tokenizer.word_index = dict(cfg["word_index"])
-        # Rebuild index_word yang dipakai texts_to_sequences.
         tok._tokenizer.index_word = {
             idx: w for w, idx in tok._tokenizer.word_index.items()
         }
