@@ -18,9 +18,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import pandas as pd
 
 from app.config import Config
-from app.core.data.gold_merge import build_model_source_from_single, standardize_columns
-from app.core.data.leakage_split import run_v5_split
 from app.core.model.metrics import bootstrap_ci_metrics, evaluate_fixed_threshold
+from app.experiment.configs import DataConfig
+from app.experiment.data_pipeline import prepare_data
 
 
 @click.command()
@@ -45,22 +45,25 @@ def main(csv_input: str | None, frozen_holdout: str | None,
     output_dir = output_dir or config.output_dir
     model_dir = model_dir or config.model_dir
 
-    df_raw = pd.read_csv(csv_input, delimiter=config.csv_delimiter,
-                         encoding=config.csv_encoding)
-    df_raw = standardize_columns(df_raw, product_col=v5.product_col)
-    text_src = config.text_col if config.text_col in df_raw.columns else v5.text_col
-    df_model_source = build_model_source_from_single(
-        df_raw, product_col=v5.product_col, text_col=text_src)
-    from app.core.data.frozen import load_frozen_products
-
-    frozen, frozen_sha = load_frozen_products(frozen_path)
-    split = run_v5_split(
-        df_model_source, product_col=v5.product_col, text_col=text_src,
-        frozen_products=frozen, holdout_safe=v5.holdout_safe,
-        holdout_unsafe=v5.holdout_unsafe, val_safe=v5.val_safe,
+    data_config = DataConfig(
+        csv_input=csv_input,
+        csv_delimiter=config.csv_delimiter,
+        csv_encoding=config.csv_encoding,
+        product_col=v5.product_col,
+        text_col=config.text_col if config.text_col else v5.text_col,
+        label_col=config.label_col,
+        seed=config.seed,
+        holdout_safe=v5.holdout_safe,
+        holdout_unsafe=v5.holdout_unsafe,
+        val_safe=v5.val_safe,
         val_unsafe=v5.val_unsafe,
+        synthetic_total=v5.synthetic_total,
+        frozen_holdout_path=frozen_path,
+        sort_source=False,  # legacy: pertahankan split artefak lama
     )
-    df_val, df_hold = split["df_real_val"], split["df_holdout"]
+    bundle = prepare_data(data_config, save_artifacts=False, save_bert_inputs=False)
+    df_val, df_hold = bundle.df_val, bundle.df_holdout
+    text_src = data_config.text_col
     assert len(df_val) == v5.val_safe + v5.val_unsafe
     assert len(df_hold) == v5.holdout_size
 

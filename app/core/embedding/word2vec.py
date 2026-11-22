@@ -17,6 +17,7 @@ def train_word2vec(
     workers: int = 1,
     epochs: int = 30,
     seed: int = 42,
+    sg: int = 1,
 ) -> Word2Vec:
     """Train a Word2Vec model on tokenized sentences.
 
@@ -28,6 +29,7 @@ def train_word2vec(
         workers: Number of worker threads.
         epochs: Number of training epochs.
         seed: Random seed.
+        sg: 1 = skip-gram, 0 = CBOW.
 
     Returns:
         Trained Word2Vec model.
@@ -38,7 +40,7 @@ def train_word2vec(
         window=window,
         min_count=min_count,
         workers=workers,
-        sg=1,
+        sg=sg,
         epochs=epochs,
         seed=seed,
     )

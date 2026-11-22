@@ -1,4 +1,10 @@
-"""Fine-tuning BERT di HPC — kontrak apel-vs-apel dengan BiLSTM.
+"""Legacy standalone HPC script (masih kompatibel).
+
+Untuk pipeline baru yang mendukung HPO, class weight, freeze layer, dan
+preset search space, gunakan `scripts/train_bert.py` atau
+`notebooks/05_indobert_tuning.ipynb`.
+
+Fine-tuning BERT di HPC — kontrak apel-vs-apel dengan BiLSTM.
 
 Input : artifacts/bert/input/{train_combined,val,holdout}.csv dari scripts/rebuild_split.py
 Aturan:

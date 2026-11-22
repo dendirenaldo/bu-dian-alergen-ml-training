@@ -1,3 +1,11 @@
+> **Update pipeline (2026):** `scripts/rebuild_split.py` sekarang memakai
+> `app.experiment.data_pipeline` dan menyortir sumber secara deterministik.
+> Data sintetik juga sudah deterministik lintas proses (perbaikan urutan term
+> KB). Jika `split_contract.json` lama tidak cocok, regenerate sekali lalu
+> latih ulang BERT. Untuk HPO BERT lokal/GPU, gunakan `scripts/tune_bert.py`
+> atau `notebooks/05_indobert_tuning.ipynb`. Protokol lengkap:
+> [`docs/HPO_PROTOCOL.md`](HPO_PROTOCOL.md).
+
 # Training BERT di HPC — Kontrak Perbandingan Apel-vs-apel
 
 Model BiLSTM final sudah dikunci lokal (`artifacts/bilstm/models/`,

@@ -1,0 +1,3 @@
+# Opsional: strategi Bayesian (TPE) untuk HPO.
+# Tanpa paket ini, strategi "bayesian" otomatis fallback ke random search.
+optuna>=3.6

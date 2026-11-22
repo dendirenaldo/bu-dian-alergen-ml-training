@@ -35,10 +35,14 @@ def _parse_clip_norm() -> float | None:
 
 @dataclass
 class V5Config:
-    """Kontrak eksperimen leakage-safe FINAL (split 50/50/399).
+    """Kontrak eksperimen leakage-safe FINAL legacy (split 50/50/399).
 
     Deviasi terdokumentasi dari notebook (bukti di komentar tiap field):
     D1 clip=1.0, D2 LR=1e-4, D3 mask_zero=True.
+
+    Catatan: config ini adalah kontrak **final legacy**. Untuk HPO dan
+    eksperimen baru, gunakan ``app.experiment.configs.BiLSTMConfig`` yang
+    punya seluruh opsi hyperparameter + validasi.
     """
 
     holdout_size: int = field(

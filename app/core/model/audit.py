@@ -171,7 +171,11 @@ def audit_pipeline_consistency_v5(
 
 
 def audit_final_config_v5(v5) -> dict:
-    """Audit konfigurasi final aktual (kontrak D1/D2/D3 + keputusan Fase 2-4).
+    """Audit konfigurasi final legacy (kontrak D1/D2/D3 + keputusan Fase 2-4).
+
+    Fungsi ini **sengaja ketat** dan hanya untuk run final legacy/CLI lama.
+    Untuk eksperimen HPO, gunakan ``app.experiment.configs.BiLSTMConfig``
+    yang memvalidasi nilai tetapi tidak memaksa satu konfigurasi tunggal.
 
     Gagal keras bila ada override env yang menyimpang dari kontrak final.
     Return dict nilai aktual untuk direkam ke manifest.

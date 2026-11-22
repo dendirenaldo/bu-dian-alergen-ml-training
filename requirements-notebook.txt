@@ -1,0 +1,7 @@
+# Notebook + tooling visualisasi
+jupyterlab>=4.0
+nbformat>=5.9
+ipykernel>=6.29
+matplotlib>=3.8
+pandas>=2.0
+numpy>=1.26

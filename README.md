@@ -5,6 +5,49 @@ Pipeline training tunggal: Word2Vec + BiLSTM dengan kontrak leakage-safe
 BERT dilatih di HPC (`artifacts/bert/` + `docs/bert-hpc.md`) memakai split
 yang identik.
 
+## Notebook & HPO (baru)
+
+Selain CLI lama, tersedia jalur pembelajaran + eksperimen baru:
+
+```bash
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-train.txt
+pip install -r requirements-notebook.txt
+export PYTHONHASHSEED=42
+jupyter lab notebooks/
+```
+
+Urutan notebook: `00` setup → `01` data/split → `02` baseline BiLSTM →
+`03` HPO BiLSTM → `04` baseline IndoBERT → `05` HPO IndoBERT →
+`06` perbandingan/laporan.
+
+CLI baru:
+
+```bash
+# training final BiLSTM (baseline atau config JSON)
+python scripts/train_bilstm.py --csv-input ./path/to/data-mengandung.csv
+
+# HPO BiLSTM
+python scripts/tune_bilstm.py --csv-input ./path/to/data-mengandung.csv \
+    --preset standard --trials 30 --strategy random \
+    --output-dir ./artifacts/hpo/bilstm_standard --retrain-best
+
+# IndoBERT (GPU)
+pip install -r requirements-bert.txt
+python scripts/train_bert.py --csv-input ./path/to/data-mengandung.csv
+python scripts/tune_bert.py --csv-input ./path/to/data-mengandung.csv \
+    --preset standard --trials 20 --output-dir ./artifacts/hpo/bert_standard
+```
+
+Catatan: dataset contoh di workspace ini ada di
+`../old/ocr_output/data-mengandung.csv`. Notebook 01 mencarinya otomatis.
+
+Dokumen:
+
+- [`docs/MODELING_AUDIT.md`](docs/MODELING_AUDIT.md) — audit end-to-end.
+- [`docs/HPO_PROTOCOL.md`](docs/HPO_PROTOCOL.md) — search space + protokol paper.
+
 ## Tech Stack (aktual)
 
 - Python 3.12, TensorFlow 2.16 (CPU), Gensim 4.3, scikit-learn, Click, Pytest
@@ -101,8 +144,10 @@ ml-training/
 │   │   ├── ocr/               # engine, composition, bold
 │   │   ├── embedding/         # word2vec
 │   │   └── model/             # architecture, tokenizer, metrics, audit
-│   └── training/
-│       └── trainer_v5.py      # Orkestrator pipeline tunggal
+│   ├── training/
+│   │   └── trainer_v5.py      # Kompatibilitas CLI legacy (thin wrapper)
+│   └── experiment/            # Pipeline baru: config, data, HPO, BERT, reporting
+├── notebooks/                 # 00–06 notebook pembelajaran + HPO
 ├── scripts/
 │   ├── train.py               # CLI training
 │   ├── bootstrap_final.py     # CI tanpa retraining

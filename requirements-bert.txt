@@ -1,0 +1,8 @@
+# Stack fine-tuning IndoBERT (bisa dipasang terpisah dari TensorFlow)
+# Disarankan di GPU node / HPC.
+torch>=2.2
+transformers>=4.40
+accelerate>=0.29
+scikit-learn>=1.5
+pandas>=2.0
+numpy>=1.26

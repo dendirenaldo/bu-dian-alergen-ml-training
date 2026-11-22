@@ -81,8 +81,28 @@ def main(src_dir: str, out_dir: str, eval_csv: str, frozen: str, threshold: floa
     except Exception:
         git_sha = "unknown"
 
-    metadata: dict = {"model": "bilstm_word2vec_v5", "git_sha": git_sha,
-                      "threshold_fixed": float(threshold), "pipeline": "v5"}
+    tokenizer_cfg = {}
+    tok_json = os.path.join(src_dir, "tokenizer_bilstm_v5.json")
+    if os.path.exists(tok_json):
+        tokenizer_cfg = json.load(open(tok_json, encoding="utf-8"))
+
+    metadata: dict = {
+        "model": "bilstm_word2vec_v5",
+        "git_sha": git_sha,
+        "threshold": float(threshold),
+        "threshold_fixed": float(threshold),
+        "pipeline": "v5",
+        "max_len": int(tokenizer_cfg.get("max_len", 120)),
+        "vocab_size": int(tokenizer_cfg.get("vocab_size", 20000)),
+        "label_mapping": {"safe": 0, "unsafe": 1},
+    }
+    # Bawa metadata training (config, data hash, environment) bila ada.
+    src_metadata = os.path.join(src_dir, "metadata.json")
+    if os.path.exists(src_metadata):
+        try:
+            metadata["training_metadata"] = json.load(open(src_metadata, encoding="utf-8"))
+        except Exception:
+            pass
     if os.path.exists(eval_csv):
         ev = pd.read_csv(eval_csv)
         metadata["eval"] = ev.to_dict(orient="records")

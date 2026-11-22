@@ -1,14 +1,109 @@
-"""Model architecture definition."""
+"""Definisi arsitektur model LSTM/BiLSTM/GRU.
+
+Fungsi ``build_model`` tetap backward-compatible dengan pemanggilan lama,
+tetapi sekarang menerima opsi tambahan yang dibutuhkan HPO:
+
+- ``rnn_type``: ``lstm`` atau ``gru``.
+- ``num_rnn_layers``: 1 atau 2 lapisan rekuren.
+- ``optimizer``: adam, adamw, rmsprop, atau sgd.
+- ``weight_decay``, ``maxnorm_value``, dan ``label_smoothing``.
+
+Semua opsi punya default yang sama dengan konfigurasi final lama agar
+training lama tidak berubah perilakunya.
+"""
+
+from __future__ import annotations
 
 import logging
 
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras.layers import Bidirectional, Dense, Dropout, Embedding, LSTM
 from tensorflow.keras.constraints import MaxNorm
+from tensorflow.keras.layers import (
+    GRU,
+    LSTM,
+    Bidirectional,
+    Dense,
+    Dropout,
+    Embedding,
+)
 from tensorflow.keras.models import Sequential
 
 logger = logging.getLogger(__name__)
+
+
+class BinaryF1(tf.keras.metrics.Metric):
+    """F1 biner pada threshold 0,5 agar bisa dipakai EarlyStopping/HPO."""
+
+    def __init__(self, threshold: float = 0.5, name: str = "f1", **kwargs):
+        super().__init__(name=name, **kwargs)
+        self.threshold = float(threshold)
+        self.tp = self.add_weight(name="tp", initializer="zeros")
+        self.fp = self.add_weight(name="fp", initializer="zeros")
+        self.fn = self.add_weight(name="fn", initializer="zeros")
+
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        y_true = tf.cast(tf.reshape(y_true, (-1,)), tf.float32)
+        y_pred = tf.cast(tf.reshape(y_pred, (-1,)) >= self.threshold, tf.float32)
+        tp = tf.reduce_sum(y_true * y_pred)
+        fp = tf.reduce_sum((1.0 - y_true) * y_pred)
+        fn = tf.reduce_sum(y_true * (1.0 - y_pred))
+        self.tp.assign_add(tp)
+        self.fp.assign_add(fp)
+        self.fn.assign_add(fn)
+
+    def result(self):
+        return 2.0 * self.tp / (2.0 * self.tp + self.fp + self.fn + 1e-8)
+
+    def reset_state(self):
+        self.tp.assign(0.0)
+        self.fp.assign(0.0)
+        self.fn.assign(0.0)
+
+
+def _build_optimizer(
+    name: str,
+    learning_rate: float,
+    weight_decay: float,
+    gradient_clip_norm: float | None,
+):
+    """Buat optimizer sesuai nama, dengan clipping opsional."""
+    name = name.lower()
+    clipnorm = gradient_clip_norm if gradient_clip_norm is not None else None
+    if name == "adam":
+        return tf.keras.optimizers.Adam(learning_rate=learning_rate, clipnorm=clipnorm)
+    if name == "adamw":
+        return tf.keras.optimizers.AdamW(
+            learning_rate=learning_rate,
+            weight_decay=weight_decay,
+            clipnorm=clipnorm,
+        )
+    if name == "rmsprop":
+        return tf.keras.optimizers.RMSprop(
+            learning_rate=learning_rate,
+            weight_decay=weight_decay,
+            clipnorm=clipnorm,
+        )
+    if name == "sgd":
+        return tf.keras.optimizers.SGD(
+            learning_rate=learning_rate,
+            momentum=0.9,
+            nesterov=True,
+            weight_decay=weight_decay,
+            clipnorm=clipnorm,
+        )
+    raise ValueError(f"Optimizer tidak dikenal: {name}")
+
+
+def _bce_with_label_smoothing(smoothing: float):
+    """Binary cross-entropy dengan label smoothing (0 = BCE biasa)."""
+
+    def loss(y_true, y_pred):
+        y_true = tf.cast(y_true, y_pred.dtype)
+        smoothed = y_true * (1.0 - smoothing) + 0.5 * smoothing
+        return tf.keras.backend.binary_crossentropy(smoothed, y_pred)
+
+    return loss
 
 
 def build_model(
@@ -22,36 +117,56 @@ def build_model(
     embed_dim: int,
     embedding_matrix: np.ndarray,
     embed_trainable: bool = False,
-    recurrent_dropout: float = 0.2,
+    recurrent_dropout: float = 0.0,
     dense_units: int = 64,
     dropout_rate_dense: float = 0.2,
     gradient_clip_norm: float | None = 1.0,
     mask_zero: bool = True,
     use_maxnorm: bool = True,
+    *,
+    rnn_type: str = "lstm",
+    num_rnn_layers: int = 2,
+    optimizer: str = "adam",
+    weight_decay: float = 0.0,
+    maxnorm_value: float = 3.0,
+    label_smoothing: float = 0.0,
 ) -> tf.keras.Model:
-    """Build a Sequential LSTM or BiLSTM model.
+    """Bangun model sekuens (Bi)LSTM/GRU untuk klasifikasi biner.
 
     Args:
-        use_bidirectional: If True, use Bidirectional LSTM layers.
-        lstm_units_1: Units for the first LSTM layer.
-        lstm_units_2: Units for the second LSTM layer.
-        dropout_1: Dropout rate after the first LSTM layer.
-        dropout_2: Dropout rate after the second LSTM layer.
-        lr: Learning rate.
-        num_words: Vocabulary size for the embedding layer.
-        embed_dim: Embedding dimension.
-        embedding_matrix: Pre-trained embedding weights.
-        embed_trainable: Whether the embedding layer is trainable.
-        recurrent_dropout: Recurrent dropout (set to 0 for cuDNN compatibility).
-        dense_units: Units for the dense layer.
-        dropout_rate_dense: Dropout rate after the dense layer.
-        gradient_clip_norm: Gradient clipping norm value (None = disabled).
-        mask_zero: Mask PAD id=0 (final default True; padding 71-85% adalah noise).
-        use_maxnorm: Batasi Dense dengan MaxNorm(3) (final default False).
+        use_bidirectional: bungkus lapisan rekuren dengan ``Bidirectional``.
+        lstm_units_1: unit lapisan rekuren pertama.
+        lstm_units_2: unit lapisan rekuren kedua (dipakai bila 2 lapisan).
+        dropout_1: dropout setelah lapisan pertama.
+        dropout_2: dropout setelah lapisan kedua.
+        lr: learning rate.
+        num_words: ukuran vocabulary untuk Embedding.
+        embed_dim: dimensi embedding.
+        embedding_matrix: bobot Word2Vec yang sudah disiapkan.
+        embed_trainable: apakah embedding ikut dilatih.
+        recurrent_dropout: dropout pada koneksi rekuren (0 untuk cuDNN).
+        dense_units: unit Dense sebelum output.
+        dropout_rate_dense: dropout setelah Dense.
+        gradient_clip_norm: batas norma gradien; ``None`` = nonaktif.
+        mask_zero: abaikan token padding (id 0).
+        use_maxnorm: batasi bobot Dense dengan MaxNorm.
+        rnn_type: ``lstm`` atau ``gru``.
+        num_rnn_layers: 1 atau 2.
+        optimizer: adam, adamw, rmsprop, atau sgd.
+        weight_decay: bobot regularisasi L2 untuk optimizer yang mendukung.
+        maxnorm_value: nilai maksimum MaxNorm.
+        label_smoothing: smoothing label untuk BCE (0 = nonaktif).
 
     Returns:
-        Compiled Keras model.
+        Model Keras yang sudah dikompilasi.
     """
+    rnn_type = rnn_type.lower()
+    if rnn_type not in ("lstm", "gru"):
+        raise ValueError("rnn_type harus 'lstm' atau 'gru'.")
+    if num_rnn_layers not in (1, 2):
+        raise ValueError("num_rnn_layers harus 1 atau 2.")
+    rnn_cls = LSTM if rnn_type == "lstm" else GRU
+
     model = Sequential()
     model.add(
         Embedding(
@@ -63,41 +178,47 @@ def build_model(
         )
     )
 
-    lstm_kwargs = dict(return_sequences=True, recurrent_dropout=recurrent_dropout)
-    lstm_kwargs2 = dict(recurrent_dropout=recurrent_dropout)
-
-    if use_bidirectional:
-        model.add(Bidirectional(LSTM(lstm_units_1, **lstm_kwargs)))
-    else:
-        model.add(LSTM(lstm_units_1, **lstm_kwargs))
+    first = rnn_cls(
+        lstm_units_1,
+        return_sequences=(num_rnn_layers == 2),
+        recurrent_dropout=recurrent_dropout,
+    )
+    model.add(Bidirectional(first) if use_bidirectional else first)
     model.add(Dropout(dropout_1))
 
-    if use_bidirectional:
-        model.add(Bidirectional(LSTM(lstm_units_2, **lstm_kwargs2)))
-    else:
-        model.add(LSTM(lstm_units_2, **lstm_kwargs2))
-    model.add(Dropout(dropout_2))
+    if num_rnn_layers == 2:
+        second = rnn_cls(
+            lstm_units_2,
+            return_sequences=False,
+            recurrent_dropout=recurrent_dropout,
+        )
+        model.add(Bidirectional(second) if use_bidirectional else second)
+        model.add(Dropout(dropout_2))
 
     if use_maxnorm:
-        model.add(Dense(dense_units, activation="relu", kernel_constraint=MaxNorm(3)))
-    else:  # V5 parity: Dense polos seperti notebook.
+        model.add(Dense(dense_units, activation="relu", kernel_constraint=MaxNorm(maxnorm_value)))
+    else:
         model.add(Dense(dense_units, activation="relu"))
     model.add(Dropout(dropout_rate_dense))
     model.add(Dense(1, activation="sigmoid"))
 
-    adam_kwargs: dict = {"learning_rate": lr}
-    if gradient_clip_norm is not None:
-        adam_kwargs["clipnorm"] = gradient_clip_norm
+    loss = _bce_with_label_smoothing(label_smoothing) if label_smoothing > 0 else "binary_crossentropy"
     model.compile(
-        optimizer=tf.keras.optimizers.Adam(**adam_kwargs),
-        loss="binary_crossentropy",
+        optimizer=_build_optimizer(optimizer, lr, weight_decay, gradient_clip_norm),
+        loss=loss,
         metrics=[
             "accuracy",
             tf.keras.metrics.Precision(name="precision"),
             tf.keras.metrics.Recall(name="recall"),
             tf.keras.metrics.AUC(name="auc"),
+            tf.keras.metrics.AUC(name="roc_auc"),
+            tf.keras.metrics.AUC(curve="PR", name="average_precision"),
+            BinaryF1(name="f1"),
         ],
     )
 
-    logger.info("Model built: bidirectional=%s, units=(%d,%d)", use_bidirectional, lstm_units_1, lstm_units_2)
+    logger.info(
+        "Model built: rnn=%s bidirectional=%s layers=%d units=(%d,%d)",
+        rnn_type, use_bidirectional, num_rnn_layers, lstm_units_1, lstm_units_2,
+    )
     return model

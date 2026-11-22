@@ -1,0 +1,6 @@
+-r requirements-train.txt
+-r requirements-bert.txt
+-r requirements-notebook.txt
+pytest==8.3.4
+ruff>=0.6
+optuna>=3.6

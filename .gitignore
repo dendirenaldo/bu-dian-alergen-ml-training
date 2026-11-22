@@ -94,3 +94,13 @@ saved_models/
 checkpoints/
 
 # Hasil HPC (500MB+, simpan di storage/HPC, bukan git)
+
+# --- Eksperimen baru (notebook + HPO) ---
+artifacts/data/
+artifacts/notebook_runs/
+artifacts/hpo/
+artifacts/runs/
+notebooks/.ipynb_checkpoints/
+*.sqlite
+*.db
+optuna.db

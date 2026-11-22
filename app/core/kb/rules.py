@@ -152,7 +152,9 @@ def rule_based_kb_label(text: Any) -> dict:
     noncanonical_hits: list[str] = []
 
     for category, info in ALLERGEN_KB.items():
-        terms = sorted(set(info["canonical"] + info["synonyms"]), key=len, reverse=True)
+        # dict.fromkeys menjaga urutan tetap (deterministik lintas proses).
+        terms = sorted(dict.fromkeys(info["canonical"] + info["synonyms"]),
+                       key=len, reverse=True)
         for term in terms:
             if _term_present(norm, term):
                 hits.append((category, term))
@@ -169,7 +171,7 @@ def rule_based_kb_label(text: Any) -> dict:
         for phrase in candidate_phrases:
             if len(phrase) < 4:
                 continue
-            for term in set(info["canonical"] + info["synonyms"]):
+            for term in dict.fromkeys(info["canonical"] + info["synonyms"]):
                 term_norm = clean_kb_text(term)
                 if len(term_norm) < 5:
                     continue
