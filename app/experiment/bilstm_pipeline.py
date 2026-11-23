@@ -484,6 +484,7 @@ def run_bilstm_trial(
             validation_data=val_ds,
             epochs=config.epochs,
             callbacks=callbacks,
+            shuffle=False,  # dataset sudah di-shuffle; hindari warning Keras
             verbose=verbose,
             **fit_extra,
         )
