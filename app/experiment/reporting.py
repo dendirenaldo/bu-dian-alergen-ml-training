@@ -423,7 +423,12 @@ def plot_param_importance(
             continue
         numeric = pd.to_numeric(values, errors="coerce")
         if numeric.notna().sum() >= max(3, 0.8 * len(values)):
-            score = abs(float(np.corrcoef(numeric.fillna(numeric.mean()), df["objective_value"])[0, 1]))
+            numeric = numeric.fillna(numeric.mean())
+            x = numeric.to_numpy(dtype=float)
+            y = df["objective_value"].to_numpy(dtype=float)
+            if x.std() == 0 or y.std() == 0:
+                continue
+            score = abs(float(np.corrcoef(x, y)[0, 1]))
             kind = "correlation"
         else:
             groups = [

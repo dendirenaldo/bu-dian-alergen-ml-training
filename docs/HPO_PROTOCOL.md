@@ -9,6 +9,8 @@ ruang pencarian, protokol seleksi, cara menjalankan, dan cara melaporkan hasil.
 
 1. **Holdout beku.** Frozen holdout (n=50) tidak dipakai untuk training,
    early stopping, pemilihan hyperparameter, atau pemilihan threshold.
+   Runner trial HPO dipanggil dengan `evaluate_holdout=False`, dan
+   `HPOEngine` menolak metrik yang berawalan `holdout_`/`test_`.
 2. **Tuning hanya di train + validation.** Validation (n=50) dipakai untuk
    memilih konfigurasi. Holdout diprediksi sekali setelah konfigurasi dibekukan.
 3. **Threshold tetap 0,5.** Tidak ada pencarian threshold di holdout.

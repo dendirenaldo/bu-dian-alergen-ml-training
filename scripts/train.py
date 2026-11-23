@@ -107,7 +107,7 @@ def info() -> None:
                f"Val: {v5.val_safe}/{v5.val_unsafe}")
     click.echo(f"  Synthetic: {v5.synthetic_total} | Threshold fixed: {v5.fixed_threshold}")
     click.echo(f"  Frozen holdout: {v5.frozen_holdout_path or '(default)'}")
-    click.echo(f"  BERT: via HPC (artifacts/bert/), bukan CLI ini")
+    click.echo("  BERT: via HPC (artifacts/bert/), bukan CLI ini")
 
 
 if __name__ == "__main__":

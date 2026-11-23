@@ -80,7 +80,8 @@ def main(
         config = BertConfig.from_dict(params)
         result = run_bert_trial(
             bundle, config, trial_dir,
-            save_model=False, save_predictions=False, verbose=False,
+            save_model=False, save_predictions=False,
+            evaluate_holdout=False, verbose=False,
         )
         return {"metrics": result.metrics, "artifacts": result.artifacts}
 

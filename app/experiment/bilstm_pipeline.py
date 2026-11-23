@@ -86,7 +86,7 @@ class BilstmTrialResult:
     metrics: dict[str, float]
     history: pd.DataFrame
     val_prob: np.ndarray
-    holdout_prob: np.ndarray
+    holdout_prob: np.ndarray | None
     artifacts: dict[str, str] = field(default_factory=dict)
     model: Any = None
     vectorized: VectorizedData | None = None
@@ -229,11 +229,11 @@ def _save_probabilities(
     val_texts: list[str],
     y_val: np.ndarray,
     val_prob: np.ndarray,
-    holdout_texts: list[str],
-    y_holdout: np.ndarray,
-    holdout_prob: np.ndarray,
+    holdout_texts: list[str] | None = None,
+    y_holdout: np.ndarray | None = None,
+    holdout_prob: np.ndarray | None = None,
 ) -> dict[str, str]:
-    """Simpan probabilitas dengan skema baru + alias lama."""
+    """Simpan probabilitas validasi; holdout hanya bila diminta."""
     output_dir.mkdir(parents=True, exist_ok=True)
     val_df = pd.DataFrame(
         {
@@ -243,30 +243,41 @@ def _save_probabilities(
             "prob_unsafe": val_prob.astype(float),
         }
     )
-    hold_df = pd.DataFrame(
-        {
-            "text": holdout_texts,
-            "label": np.where(y_holdout == 1, "unsafe", "safe"),
-            "label_id": y_holdout.astype(int),
-            "prob_unsafe": holdout_prob.astype(float),
-        }
-    )
     val_path = output_dir / "probs_val.csv"
-    hold_path = output_dir / "probs_holdout.csv"
     val_df.to_csv(val_path, index=False)
-    hold_df.to_csv(hold_path, index=False)
     # Alias lama yang dibaca paper/make_figs.py.
     val_df[["label_id", "prob_unsafe"]].to_csv(output_dir / "val_probs.csv", index=False)
-    return {"probs_val": str(val_path), "probs_holdout": str(hold_path)}
+    artifacts = {"probs_val": str(val_path)}
+    if holdout_prob is not None and holdout_texts is not None and y_holdout is not None:
+        hold_df = pd.DataFrame(
+            {
+                "text": holdout_texts,
+                "label": np.where(y_holdout == 1, "unsafe", "safe"),
+                "label_id": y_holdout.astype(int),
+                "prob_unsafe": holdout_prob.astype(float),
+            }
+        )
+        hold_path = output_dir / "probs_holdout.csv"
+        hold_df.to_csv(hold_path, index=False)
+        artifacts["probs_holdout"] = str(hold_path)
+    return artifacts
 
 
-def _save_roc_data(output_dir: Path, y_val, val_prob, y_hold, hold_prob) -> str:
+def _save_roc_data(
+    output_dir: Path,
+    y_val,
+    val_prob,
+    y_hold=None,
+    hold_prob=None,
+) -> str:
     from sklearn.metrics import roc_curve
 
     payload = {}
     for name, y_true, y_prob in (
         ("val", y_val, val_prob), ("holdout", y_hold, hold_prob),
     ):
+        if y_true is None or y_prob is None:
+            continue
         fpr, tpr, _ = roc_curve(y_true, y_prob)
         payload[name] = {"fpr": fpr.tolist(), "tpr": tpr.tolist()}
     path = output_dir / "roc_data.json"
@@ -283,6 +294,7 @@ def run_bilstm_trial(
     save_model: bool = False,
     model_save_path: str | os.PathLike | None = None,
     save_predictions: bool = True,
+    evaluate_holdout: bool = True,
     verbose: int = 0,
 ) -> BilstmTrialResult:
     """Latih satu konfigurasi BiLSTM dan evaluasi di val + holdout.
@@ -295,6 +307,8 @@ def run_bilstm_trial(
         save_model: simpan model Keras.
         model_save_path: path model (default ``output_dir/model.keras``).
         save_predictions: simpan CSV probabilitas.
+        evaluate_holdout: prediksi holdout. Untuk HPO **harus False** agar
+            holdout tidak disentuh sampai model terbaik dipilih.
         verbose: nilai ``verbose`` untuk ``model.fit``.
     """
     from app.repro import apply_reproducibility_lock, seed_all
@@ -396,10 +410,15 @@ def run_bilstm_trial(
     train_seconds = time.time() - started
 
     val_prob = np.asarray(model.predict(vectorized.X_val, verbose=0)).ravel()
-    holdout_prob = np.asarray(model.predict(vectorized.X_holdout, verbose=0)).ravel()
+    holdout_prob: np.ndarray | None = None
+    if evaluate_holdout:
+        holdout_prob = np.asarray(model.predict(vectorized.X_holdout, verbose=0)).ravel()
 
     val_metrics = classification_metrics(vectorized.y_val, val_prob)
-    holdout_metrics = classification_metrics(vectorized.y_holdout, holdout_prob)
+    holdout_metrics = (
+        classification_metrics(vectorized.y_holdout, holdout_prob)
+        if holdout_prob is not None else {}
+    )
     hist = _history_frame(history)
     hist.to_csv(out / "training_history.csv", index=False)
     best_epoch = _best_epoch(hist, config)
@@ -437,11 +456,15 @@ def run_bilstm_trial(
             _save_probabilities(
                 out,
                 vectorized.val_texts, vectorized.y_val, val_prob,
-                vectorized.holdout_texts, vectorized.y_holdout, holdout_prob,
+                vectorized.holdout_texts if holdout_prob is not None else None,
+                vectorized.y_holdout if holdout_prob is not None else None,
+                holdout_prob,
             )
         )
         artifacts["roc_data"] = _save_roc_data(
-            out, vectorized.y_val, val_prob, vectorized.y_holdout, holdout_prob
+            out, vectorized.y_val, val_prob,
+            vectorized.y_holdout if holdout_prob is not None else None,
+            holdout_prob,
         )
     if save_model:
         artifacts["model"] = str(checkpoint_path)
@@ -495,6 +518,7 @@ def train_final_bilstm(
         verbose=verbose,
     )
     assert result.vectorized is not None
+    assert result.holdout_prob is not None, "Training final wajib mengevaluasi holdout."
 
     # Simpan tokenizer + Word2Vec dengan nama kontrak lama.
     with (models / "tokenizer_v5.pkl").open("wb") as handle:

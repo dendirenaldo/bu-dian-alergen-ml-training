@@ -1,8 +1,6 @@
 """Word2Vec embedding training and embedding matrix construction."""
 
 import logging
-from typing import Any
-
 import numpy as np
 from gensim.models import Word2Vec
 

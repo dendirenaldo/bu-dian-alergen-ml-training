@@ -46,3 +46,14 @@ def test_notebook_punya_markdown_pembuka():
         first = payload["cells"][0]
         assert first["cell_type"] == "markdown"
         assert "".join(first["source"]).strip().startswith("#")
+
+
+def test_setup_menyediakan_import_umum():
+    """Semua notebook harus punya pandas/matplotlib di sel setup pertama."""
+    for name in EXPECTED:
+        payload = json.loads((NOTEBOOK_DIR / name).read_text(encoding="utf-8"))
+        code_cells = [c for c in payload["cells"] if c["cell_type"] == "code"]
+        setup = "".join(code_cells[0]["source"])
+        assert "import pandas as pd" in setup, name
+        assert "import matplotlib.pyplot as plt" in setup, name
+        assert "import numpy as np" in setup, name

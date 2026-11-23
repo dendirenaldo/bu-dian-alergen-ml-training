@@ -95,7 +95,8 @@ def main(
         result = run_bilstm_trial(
             bundle, config, trial_dir,
             vectorized=vectorized,
-            save_model=False, save_predictions=False, verbose=0,
+            save_model=False, save_predictions=False,
+            evaluate_holdout=False, verbose=0,
         )
         return {"metrics": result.metrics, "artifacts": result.artifacts}
 

@@ -301,11 +301,24 @@ Catatan: artefak lama di `artifacts/bert/input/` dan hasil BERT lama dibuat
 sebelum perbaikan ini. Regenerate split dan latih ulang BERT sekali agar hasil
 konsisten dengan kode saat ini.
 
-### 10.4 Validasi
+### 10.4 Guard protokol holdout
+
+Ditemukan saat audit lanjutan: runner trial HPO awalnya tetap memprediksi
+holdout meskipun pemilihan memakai validation. Ini melanggar aturan "holdout
+hanya diprediksi sekali". Perbaikan:
+
+- `run_bilstm_trial(..., evaluate_holdout=False)` dan
+  `run_bert_trial(..., evaluate_holdout=False)` dipakai semua objective HPO.
+- `HPOEngine` menolak trial yang mengembalikan metrik berawalan
+  `holdout_`/`test_` (`forbid_holdout_metrics=True`).
+- Training final tetap `evaluate_holdout=True` dan diakhiri assert bahwa
+  holdout benar-benar dievaluasi.
+
+### 10.5 Validasi
 
 | Pemeriksaan | Hasil |
 |---|---|
-| `pytest -q` | 45 passed, 1 skipped (46 collected) |
+| `pytest -q` | 47 passed, 1 skipped (48 collected) |
 | Import modul baru tanpa TF/Torch | PASS |
 | Notebook JSON + syntax | PASS (7 notebook) |
 | Data pipeline dengan CSV 499 baris | PASS, split 399/50/50 |
@@ -313,7 +326,7 @@ konsisten dengan kode saat ini.
 | Determinisme split saat urutan CSV diacak (`sort_source=True`) | PASS (train/val/holdout identik) |
 | Training BiLSTM/IndoBERT | Belum dieksekusi di environment audit (TF/GPU tidak tersedia) |
 
-### 10.5 Yang masih perlu dijalankan user
+### 10.6 Yang masih perlu dijalankan user
 
 1. Smoke test BiLSTM 1–2 epoch di environment Python 3.12 + TensorFlow.
 2. Smoke fine-tuning IndoBERT 1 epoch di GPU.
@@ -321,3 +334,66 @@ konsisten dengan kode saat ini.
 4. Regenerate split BERT setelah perbaikan determinisme.
 5. Perbarui paper: search space, jumlah trial, protokol seleksi, CI, uji
    statistik, dan ablasi synthetic.
+
+---
+
+## 11. Audit Lanjutan: Import, Runtime Notebook, dan Cross-Project
+
+Audit ini dilakukan setelah push pertama, karena ditemukan beberapa error
+import saat notebook dijalankan.
+
+### 11.1 Temuan import notebook
+
+| ID | Severity | Temuan | Perbaikan |
+|---|---|---|---|
+| N1 | P1 | Notebook 02, 03, 04, 05 memakai `pd`/`plt` tanpa import di sel tersebut | Semua notebook sekarang mengimpor `numpy`, `pandas`, dan `matplotlib.pyplot` di sel setup pertama. |
+| N2 | P1 | Notebook 03/05 memakai `pd` sebelum sel `import pandas as pd` | Import dipindahkan ke setup; duplikasi dihapus. |
+| N3 | P2 | Notebook 02/04 memakai `plt` tanpa import | Import `matplotlib.pyplot` ditambahkan ke setup. |
+| N4 | P2 | Notebook 06 mengimpor ulang `json`/`numpy`/`pandas`/`plt` | Duplikasi dihapus; setup menjadi satu sumber import umum. |
+| N5 | P2 | Pengguna bisa menjalankan sel tengah dan mendapat `NameError` | `notebooks/README.md` dan notebook 00 sekarang menekankan **Restart & Run All**. |
+
+### 11.2 Temuan runtime Python
+
+| ID | Severity | Temuan | Perbaikan |
+|---|---|---|---|
+| R1 | P1 | `app/experiment/bert_pipeline.py` memakai closure `trainer` yang kemudian di-`del`; pyflakes menandai undefined name dan berisiko `NameError` jika urutan berubah | `_predict()` sekarang menerima `trainer` sebagai argumen eksplisit. |
+| R2 | P1 | Setiap trial HPO tetap memprediksi holdout | Ditambahkan `evaluate_holdout=False` untuk semua objective HPO; `HPOEngine` menolak metrik `holdout_*`/`test_*`. Training final tetap mengevaluasi holdout sekali dan diakhiri assert. |
+| R3 | P2 | `_require_bert_stack()` mengimpor `torch`/`transformers` hanya untuk cek | Diganti `importlib.util.find_spec()` agar tidak memuat library berat. |
+| R4 | P2 | Unused import di `word2vec.py`, `scripts/train.py`, `paper/`, `train_bert_hpc.py` | Dibersihkan; pyflakes bersih. |
+| R5 | P3 | `plot_param_importance` memunculkan `RuntimeWarning` untuk parameter konstan | Ditambahkan guard `std == 0`; diuji dengan `-W error::RuntimeWarning`. |
+
+### 11.3 Validasi eksekusi notebook (dengan mock untuk bagian berat)
+
+| Notebook | Metode | Hasil |
+|---|---|---|
+| 00 | eksekusi penuh | PASS |
+| 01 | eksekusi penuh + data asli 499 baris | PASS |
+| 02 | mock vektorisasi + training | PASS |
+| 03 | mock trial + HPO engine 4 trial | PASS |
+| 04 | mock fine-tuning (tokenizer download dilewati) | PASS |
+| 05 | mock trial + HPO engine 4 trial | PASS |
+| 06 | data probabilitas dummy 4 model | PASS |
+
+Mock dipakai hanya karena TensorFlow/GPU tidak tersedia di environment audit;
+tujuannya memvalidasi alur kode, import, dan penamaan variabel, bukan kualitas
+model.
+
+### 11.4 Audit cross-project
+
+| Proyek | Pemeriksaan | Hasil |
+|---|---|---|
+| `bu-dian-alergen-ml-training` | `pytest`, `pyflakes`, compile, notebook syntax | PASS (47 test, 1 skip) |
+| `bu-dian-alergen-ml-service` | `pyflakes`, `compileall` | PASS |
+| `bu-dian-alergen-backend` | `npm run typecheck`, `npm run test:unit` | PASS (40 test) |
+| `bu-dian-alergen-web` | `npm run typecheck`, `npm test` | PASS (56 test) |
+| `bu-dian-alergen-mobile` | `flutter analyze` | PASS (no issues) |
+| `old/` (legacy) | `pyflakes` | Hanya unused import; tidak ada undefined name |
+
+### 11.5 Catatan
+
+- Pyflakes pada notebook hanya menyisakan **unused import** dari setup umum
+  (`numpy`/`matplotlib` di notebook yang tidak memakainya). Ini disengaja agar
+  setiap notebook siap dipakai dan tidak ada `NameError`.
+- `old/` adalah kode legacy dan tidak dipakai pipeline baru.
+- Training TensorFlow/IndoBERT tetap perlu dijalankan di environment Python
+  3.12 + GPU/HPC untuk validasi kualitas model sebenarnya.

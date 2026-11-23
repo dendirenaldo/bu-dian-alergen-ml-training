@@ -217,3 +217,19 @@ def test_hpo_bayesian_fallback_tanpa_optuna(tmp_path, monkeypatch):
     )
     assert len(result.trials) == 3
     assert all(trial.status == "ok" for trial in result.trials)
+
+
+def test_hpo_menolak_metrik_holdout(tmp_path):
+    space = SearchSpace({"x": Categorical((1,))})
+    config = HPOConfig(
+        n_trials=1, output_dir=str(tmp_path), study_name="guard", seed=1
+    )
+    result = HPOEngine(config, space, run_dir=tmp_path / "run", verbose=False).run(
+        lambda params, index, trial_dir: {
+            "metrics": {"val_f1": 0.9, "holdout_f1": 0.8}
+        }
+    )
+    assert len(result.trials) == 1
+    assert result.trials[0].status == "failed"
+    assert "holdout" in (result.trials[0].error or "")
+    assert result.best is None

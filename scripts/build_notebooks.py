@@ -67,6 +67,10 @@ import os
 import sys
 from pathlib import Path
 
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
 # Notebook biasanya dijalankan dari folder notebooks/. Kita pindah ke root
 # project agar semua path artefak konsisten.
 PROJECT_ROOT = Path.cwd().resolve()
@@ -90,9 +94,6 @@ print("Runs dir     :", RUNS_DIR)
 
 
 LOAD_DATA = r"""
-import json
-from pathlib import Path
-
 from app.experiment.configs import DataConfig
 from app.experiment.data_pipeline import prepare_data
 
@@ -193,6 +194,10 @@ agar notebook mudah dibaca.
         """
 ## Cara menjalankan
 
+> Jalankan notebook dari sel pertama (`Restart Kernel and Run All Cells`).
+> Notebook memakai state antar sel; melompat ke sel tengah bisa memunculkan
+> `NameError`.
+
 Disarankan memakai **Python 3.10–3.12**. TensorFlow 2.16 belum mendukung
 Python 3.14, jadi environment yang dipakai untuk training harus Python 3.12
 (atau 3.10/3.11).
@@ -235,7 +240,6 @@ akan memberi pesan yang jelas.
     ),
     code(
         r"""
-import sys
 from app.experiment.artifacts import environment_snapshot
 
 snapshot = environment_snapshot(seed=42)
@@ -349,10 +353,6 @@ Output notebook ini dipakai oleh semua notebook training.
     code(SETUP),
     code(
         r"""
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-
 from app.experiment.configs import DataConfig
 from app.experiment.data_pipeline import prepare_data, write_bert_inputs
 from app.experiment.artifacts import write_json
@@ -872,6 +872,7 @@ def objective(params, trial_index, trial_dir):
         vectorized=vectorized,
         save_model=False,
         save_predictions=False,
+        evaluate_holdout=False,
         verbose=0,
     )
     return {"metrics": result.metrics, "artifacts": result.artifacts}
@@ -918,8 +919,6 @@ gagal tetap dicatat — ini penting untuk audit.
     ),
     code(
         r"""
-import pandas as pd
-
 leaderboard = pd.read_csv(hpo_result.run_dir / "leaderboard.csv")
 columns = ["trial_id", "status", "objective", "metric_val_f1", "metric_val_roc_auc", "metric_val_loss", "duration_sec"]
 columns = [column for column in columns if column in leaderboard.columns]
@@ -1267,6 +1266,7 @@ def objective(params, trial_index, trial_dir):
         trial_dir,
         save_model=False,
         save_predictions=False,
+        evaluate_holdout=False,
         verbose=False,
     )
     return {"metrics": result.metrics, "artifacts": result.artifacts}
@@ -1447,13 +1447,6 @@ interval kepercayaan dan uji berpasangan.
     code(SETUP),
     code(
         r"""
-import json
-from pathlib import Path
-
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-
 from app.experiment.reporting import (
     bootstrap_ci,
     classification_metrics,

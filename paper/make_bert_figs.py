@@ -11,7 +11,6 @@ from pathlib import Path
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
 from sklearn.metrics import (auc, confusion_matrix, precision_recall_curve,

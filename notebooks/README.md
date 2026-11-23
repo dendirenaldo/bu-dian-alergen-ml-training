@@ -4,6 +4,10 @@ Folder ini berisi notebook yang menjelaskan pipeline pemodelan dari nol.
 Kode berat ada di `app/experiment/`; notebook hanya mengatur alur, menampilkan
 hasil, dan memberi penjelasan.
 
+> **Selalu jalankan dari sel pertama** (`Restart Kernel and Run All Cells`).
+> Notebook memakai state antar sel (import, path, variabel data), jadi
+> melompat ke sel tengah bisa menghasilkan `NameError`.
+
 ## Urutan menjalankan
 
 | # | Notebook | Waktu | Prasyarat |

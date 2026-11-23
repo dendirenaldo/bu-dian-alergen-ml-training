@@ -368,6 +368,17 @@ class HPOEngine:
         try:
             result = objective_fn(params_with_seed, index, trial_dir)
             metrics, artifacts = _extract_metrics(result)
+            if self.config.forbid_holdout_metrics:
+                leaked = sorted(
+                    key for key in metrics
+                    if key.lower().startswith(("holdout", "test"))
+                )
+                if leaked:
+                    raise ConfigError(
+                        "Trial HPO menghasilkan metrik holdout/test: "
+                        f"{leaked}. HPO hanya boleh memakai validation; "
+                        "set evaluate_holdout=False pada runner."
+                    )
             if self.config.objective_metric not in metrics:
                 raise ConfigError(
                     f"Metrik objektif '{self.config.objective_metric}' tidak ada. "

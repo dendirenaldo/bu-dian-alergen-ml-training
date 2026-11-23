@@ -305,6 +305,7 @@ class HPOConfig:
     save_trial_models: bool = False
     max_grid_combinations: int = 200
     log_every_trial: bool = True
+    forbid_holdout_metrics: bool = True
 
     def __post_init__(self) -> None:
         _require(
@@ -324,6 +325,10 @@ class HPOConfig:
         _require(self.objective_mode in ("max", "min"), "objective_mode harus 'max' atau 'min'.")
         _require(bool(self.study_name), "study_name tidak boleh kosong.")
         _require(self.max_grid_combinations > 0, "max_grid_combinations harus > 0.")
+        _require(
+            isinstance(self.forbid_holdout_metrics, bool),
+            "forbid_holdout_metrics harus boolean.",
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

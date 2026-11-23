@@ -41,7 +41,7 @@ class BertTrialResult:
     metrics: dict[str, float]
     history: list[dict[str, Any]]
     val_prob: np.ndarray
-    holdout_prob: np.ndarray
+    holdout_prob: np.ndarray | None
     artifacts: dict[str, str] = field(default_factory=dict)
     model: Any = None
     tokenizer: Any = None
@@ -66,15 +66,19 @@ class TextDataset:
 
 
 def _require_bert_stack():
-    try:
-        import torch  # noqa: F401
-        import transformers  # noqa: F401
-    except ImportError as exc:  # pragma: no cover
+    import importlib.util
+
+    missing = [
+        name for name in ("torch", "transformers", "accelerate")
+        if importlib.util.find_spec(name) is None
+    ]
+    if missing:  # pragma: no cover
         raise ImportError(
-            "Training IndoBERT membutuhkan torch + transformers + accelerate. "
-            "Aktifkan environment Python 3.10–3.12 lalu "
+            "Training IndoBERT membutuhkan paket: "
+            + ", ".join(missing)
+            + ". Aktifkan environment Python 3.10–3.12 lalu "
             "`pip install -r requirements-bert.txt`."
-        ) from exc
+        )
 
 
 def _encode(tokenizer: Any, texts: list[str], max_len: int) -> dict[str, list[list[int]]]:
@@ -274,6 +278,7 @@ def run_bert_trial(
     *,
     save_model: bool = False,
     save_predictions: bool = True,
+    evaluate_holdout: bool = True,
     verbose: bool = True,
 ) -> BertTrialResult:
     """Fine-tune satu konfigurasi IndoBERT dan evaluasi val + holdout."""
@@ -363,10 +368,14 @@ def run_bert_trial(
     history = list(trainer.state.log_history)
     write_json(out / "training_log.json", history)
 
-    def _predict(texts: list[str], y: np.ndarray) -> tuple[np.ndarray, np.ndarray, float]:
+    def _predict(
+        active_trainer: Any,
+        texts: list[str],
+        y: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray, float]:
         enc = _encode(tokenizer, texts, config.max_len)
         dataset = TextDataset(enc, _labels_from_ids(y))
-        prediction = trainer.predict(dataset)
+        prediction = active_trainer.predict(dataset)
         logits = prediction.predictions
         if isinstance(logits, tuple):
             logits = logits[0]
@@ -376,16 +385,24 @@ def run_bert_trial(
         prob = (exp / exp.sum(axis=1, keepdims=True))[:, 1]
         return np.asarray(y).astype(int), prob, float(prediction.metrics.get("test_loss", float("nan")))
 
-    y_val, val_prob, val_loss = _predict(bundle.X_val_text, bundle.y_val)
-    y_hold, hold_prob, hold_loss = _predict(bundle.X_holdout_text, bundle.y_holdout)
+    y_val, val_prob, val_loss = _predict(trainer, bundle.X_val_text, bundle.y_val)
+    y_hold = None
+    hold_prob = None
+    hold_loss = float("nan")
+    if evaluate_holdout:
+        y_hold, hold_prob, hold_loss = _predict(
+            trainer, bundle.X_holdout_text, bundle.y_holdout
+        )
 
     val_metrics = classification_metrics(y_val, val_prob)
-    hold_metrics = classification_metrics(y_hold, hold_prob)
+    hold_metrics = (
+        classification_metrics(y_hold, hold_prob)
+        if y_hold is not None and hold_prob is not None else {}
+    )
     metrics = {
         **{f"val_{key}": value for key, value in val_metrics.items()},
         **{f"holdout_{key}": value for key, value in hold_metrics.items()},
         "val_loss": val_loss,
-        "holdout_loss": hold_loss,
         "train_seconds": float(train_seconds),
         "epochs_ran": float(trainer.state.epoch or 0.0),
         "best_checkpoint": str(trainer.state.best_model_checkpoint or ""),
@@ -396,6 +413,8 @@ def run_bert_trial(
         ),
         **freeze_info,
     }
+    if evaluate_holdout:
+        metrics["holdout_loss"] = hold_loss
     write_json(out / "metrics.json", metrics)
     write_json(
         out / "training_summary.json",
@@ -421,22 +440,25 @@ def run_bert_trial(
                 "prob_unsafe": val_prob.astype(float),
             }
         )
-        hold_df = pd.DataFrame(
-            {
-                "text": bundle.X_holdout_text,
-                "label": np.where(bundle.y_holdout == 1, "unsafe", "safe"),
-                "label_id": bundle.y_holdout.astype(int),
-                "prob_unsafe": hold_prob.astype(float),
-            }
-        )
         val_df.to_csv(out / "probs_val.csv", index=False)
-        hold_df.to_csv(out / "probs_holdout.csv", index=False)
         artifacts["probs_val"] = str(out / "probs_val.csv")
-        artifacts["probs_holdout"] = str(out / "probs_holdout.csv")
+        if hold_prob is not None and y_hold is not None:
+            hold_df = pd.DataFrame(
+                {
+                    "text": bundle.X_holdout_text,
+                    "label": np.where(bundle.y_holdout == 1, "unsafe", "safe"),
+                    "label_id": bundle.y_holdout.astype(int),
+                    "prob_unsafe": hold_prob.astype(float),
+                }
+            )
+            hold_df.to_csv(out / "probs_holdout.csv", index=False)
+            artifacts["probs_holdout"] = str(out / "probs_holdout.csv")
         from sklearn.metrics import roc_curve
 
         roc_payload = {}
         for name, y_true, prob in (("val", y_val, val_prob), ("holdout", y_hold, hold_prob)):
+            if y_true is None or prob is None:
+                continue
             fpr, tpr, _ = roc_curve(y_true, prob)
             roc_payload[name] = {"fpr": fpr.tolist(), "tpr": tpr.tolist()}
         write_json(out / "roc_data.json", roc_payload)
@@ -499,6 +521,7 @@ def train_final_bert(
         save_model=True, save_predictions=True, verbose=verbose,
     )
 
+    assert result.holdout_prob is not None, "Training final wajib mengevaluasi holdout."
     validation = {
         key.replace("val_", ""): value
         for key, value in result.metrics.items()
