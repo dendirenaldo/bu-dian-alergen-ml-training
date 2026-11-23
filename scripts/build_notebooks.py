@@ -560,6 +560,10 @@ dipakai di paper. Tujuannya:
 3. Menyimpan artefak model yang bisa diekspor ke layanan inferensi.
 
 Model ini menjadi pembanding untuk hasil HPO di notebook 03.
+
+**GPU:** pipeline otomatis memakai semua GPU yang terlihat lewat
+`MirroredStrategy`, mixed precision FP16, dan `tf.data`. Pada RTX 3080 Ti
+(12 GB), batch 16–32 dan `max_len` 120–160 biasanya aman.
 """
     ),
     md(
@@ -611,6 +615,11 @@ config = BiLSTMConfig()
 if QUICK_RUN:
     config.epochs = 5
     config.early_stopping_patience = 2
+
+# RTX 3080 Ti: mixed_float16 + tf.data + steps_per_execution sudah default.
+# Kurangi steps_per_execution ke 1 jika ingin debugging per-step.
+print("mixed_precision:", config.mixed_precision)
+print("multi_gpu:", config.multi_gpu, "| auto_scale_batch_size:", config.auto_scale_batch_size)
 
 pd.DataFrame([config.to_dict()]).T.rename(columns={0: "nilai"})
 """
@@ -797,6 +806,10 @@ pencarian yang jelas + protokol seleksi yang jujur.**
 4. Model dipilih berdasarkan metrik validation (default F1).
 5. Setelah terbaik dipilih, model di-retrain dan diuji **sekali** di holdout.
 6. Untuk paper, jalankan beberapa seed dan laporkan varians.
+
+**GPU:** setiap trial memakai semua GPU yang terlihat (MirroredStrategy),
+jadi HPO berjalan sequential. Pada 2× RTX 3080 Ti, batch per GPU tetap
+`batch_size`, sedangkan batch global otomatis 2×.
 """
     ),
     md(
@@ -1075,6 +1088,8 @@ Notebook ini melatih IndoBERT pada split yang sama dengan BiLSTM.
 6. Bobot pre-trained disesuaikan (fine-tuned) dengan data kita.
 
 Karena model jauh lebih besar dari BiLSTM, GPU sangat disarankan.
+Notebook ini berjalan **single-GPU**. Untuk 2 GPU, gunakan
+`accelerate launch --multi_gpu --num_processes 2 scripts/train_bert.py ...`.
 """
     ),
     code(SETUP),
@@ -1090,6 +1105,19 @@ if QUICK_RUN:
     config.epochs = 1
     config.max_len = 128
     config.early_stopping_patience = 1
+
+# Optimasi RTX 3080 Ti (Ampere): FP16 + TF32 + auto batch size.
+try:
+    import torch
+    if torch.cuda.is_available():
+        config.precision = "fp16"
+        config.tf32 = True
+        config.auto_find_batch_size = True
+        config.dataloader_pin_memory = True
+        print("GPU:", torch.cuda.get_device_name(0))
+        print("Precision:", config.precision, "| TF32:", config.tf32)
+except Exception as exc:
+    print("GPU tidak aktif / torch belum siap:", exc)
 
 pd.DataFrame([config.to_dict()]).T.rename(columns={0: "nilai"})
 """
@@ -1230,6 +1258,11 @@ Ruang pencarian mencakup model checkpoint, panjang token, learning rate,
 batch, weight decay, warmup, scheduler, optimizer, gradient clipping,
 gradient accumulation, freeze layer, dropout, class weight, label smoothing,
 presisi (fp32/fp16/bf16), dan metrik seleksi.
+
+**Multi-GPU:** HPO BERT berjalan sequential (satu trial memakai satu GPU).
+Untuk memanfaatkan 2× RTX 3080 Ti, jalankan beberapa proses HPO dengan
+`CUDA_VISIBLE_DEVICES` dan `--output-dir` berbeda. Untuk training final
+multi-GPU, gunakan `accelerate launch --multi_gpu`.
 """
     ),
     code(SETUP),

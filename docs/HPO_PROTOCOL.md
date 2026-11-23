@@ -287,3 +287,18 @@ Versi Inggris singkat:
 - Jika GPU/driver tetap menolak op deterministik, set
   `BiLSTMConfig(deterministic=False)` untuk run tersebut dan catat di laporan
   bahwa reproducibility GPU dibatasi oleh driver.
+
+---
+
+## 11. Catatan GPU (RTX 3080 Ti)
+
+- BiLSTM: `mixed_float16`, `MirroredStrategy` otomatis, `tf.data`.
+  `batch_size` adalah batch **per GPU**; batch global = batch × jumlah GPU.
+- BERT: gunakan `precision="fp16"`, `tf32=True`,
+  `optimizer="adamw_torch_fused"`, `auto_find_batch_size=True` untuk 12 GB.
+- HPO BiLSTM memakai semua GPU di dalam satu proses.
+- HPO BERT tetap sequential; untuk 2 GPU jalankan dua proses `tune_bert.py`
+  dengan `CUDA_VISIBLE_DEVICES` dan `--output-dir` berbeda.
+- Training BERT final multi-GPU memakai
+  `accelerate launch --multi_gpu --num_processes 2`.
+- Panduan lengkap: [`GPU_OPTIMIZATION.md`](GPU_OPTIMIZATION.md).

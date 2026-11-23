@@ -13,6 +13,7 @@ import click
 from app.experiment.bilstm_pipeline import train_final_bilstm
 from app.experiment.configs import BiLSTMConfig, DataConfig
 from app.experiment.data_pipeline import prepare_data
+from app.experiment.gpu import distributed_world_size
 
 
 @click.command()
@@ -22,6 +23,13 @@ from app.experiment.data_pipeline import prepare_data
 @click.option("--output-dir", default="./artifacts/bilstm/output")
 @click.option("--model-dir", default="./artifacts/bilstm/models")
 @click.option("--seed", default=42, type=int)
+@click.option("--mixed-precision", type=click.Choice(["float32", "mixed_float16", "mixed_bfloat16"]), default=None)
+@click.option("--batch-size", type=int, default=None)
+@click.option("--epochs", type=int, default=None)
+@click.option("--max-len", type=int, default=None)
+@click.option("--steps-per-execution", type=int, default=None)
+@click.option("--multi-gpu/--single-gpu", default=True)
+@click.option("--tf-data/--no-tf-data", default=True)
 def main(
     csv_input: str,
     frozen_holdout: str | None,
@@ -29,7 +37,19 @@ def main(
     output_dir: str,
     model_dir: str,
     seed: int,
+    mixed_precision: str | None,
+    batch_size: int | None,
+    epochs: int | None,
+    max_len: int | None,
+    steps_per_execution: int | None,
+    multi_gpu: bool,
+    tf_data: bool,
 ) -> None:
+    if distributed_world_size() > 1:
+        raise click.UsageError(
+            "Training BiLSTM multi-GPU memakai MirroredStrategy dalam SATU proses. "
+            "Jangan jalankan lewat `accelerate launch`/`torchrun`."
+        )
     from app.repro import apply_reproducibility_lock, seed_all
 
     apply_reproducibility_lock(seed)
@@ -50,6 +70,18 @@ def main(
         config.seed = seed
     else:
         config = BiLSTMConfig(seed=seed)
+    if mixed_precision is not None:
+        config.mixed_precision = mixed_precision
+    if batch_size is not None:
+        config.batch_size = batch_size
+    if epochs is not None:
+        config.epochs = epochs
+    if max_len is not None:
+        config.max_len = max_len
+    if steps_per_execution is not None:
+        config.steps_per_execution = steps_per_execution
+    config.multi_gpu = multi_gpu
+    config.use_tf_data = tf_data
 
     output = train_final_bilstm(
         bundle, config, output_dir=output_dir, model_dir=model_dir,

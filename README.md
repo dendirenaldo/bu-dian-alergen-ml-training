@@ -47,6 +47,7 @@ Dokumen:
 
 - [`docs/MODELING_AUDIT.md`](docs/MODELING_AUDIT.md) — audit end-to-end.
 - [`docs/HPO_PROTOCOL.md`](docs/HPO_PROTOCOL.md) — search space + protokol paper.
+- [`docs/GPU_OPTIMIZATION.md`](docs/GPU_OPTIMIZATION.md) — RTX 3080 Ti, mixed precision, dan multi-GPU.
 
 ## Tech Stack (aktual)
 

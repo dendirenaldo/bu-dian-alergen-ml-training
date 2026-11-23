@@ -51,6 +51,16 @@ jupyter lab
 
 Semua folder di atas bersifat **generated** dan tidak di-commit.
 
+## GPU
+
+- **BiLSTM** (notebook 02/03) otomatis memakai semua GPU yang terlihat
+  lewat `MirroredStrategy`, FP16, dan `tf.data`.
+- **IndoBERT** (notebook 04/05) berjalan single-GPU. Untuk 2 GPU, gunakan
+  `accelerate launch --multi_gpu --num_processes 2 scripts/train_bert.py ...`.
+- HPO BERT tetap sequential; untuk 2 GPU jalankan dua proses `tune_bert.py`
+  dengan `CUDA_VISIBLE_DEVICES` berbeda.
+- Panduan RTX 3080 Ti: [`docs/GPU_OPTIMIZATION.md`](../docs/GPU_OPTIMIZATION.md).
+
 ## Aturan penting
 
 1. Jalankan notebook 01 dulu; notebook lain membaca `artifacts/data/data_config.json`.

@@ -25,6 +25,7 @@ from app.experiment.bilstm_pipeline import (
 )
 from app.experiment.configs import BiLSTMConfig, DataConfig, HPOConfig
 from app.experiment.data_pipeline import prepare_data
+from app.experiment.gpu import distributed_world_size
 from app.experiment.hpo import HPOEngine
 from app.experiment.search_spaces import bilstm_search_space, preset_trials
 
@@ -52,6 +53,11 @@ def main(
     output_dir: str,
     retrain_best: bool,
 ) -> None:
+    if distributed_world_size() > 1:
+        raise click.UsageError(
+            "HPO BiLSTM harus single-process; MirroredStrategy memakai semua GPU "
+            "di dalam satu proses. Jalankan satu proses saja."
+        )
     from app.repro import apply_reproducibility_lock, seed_all
 
     apply_reproducibility_lock(seed)

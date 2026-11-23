@@ -145,6 +145,15 @@ class BiLSTMConfig:
     monitor: Literal["val_loss", "val_f1"] = "val_loss"
     monitor_mode: Literal["min", "max"] = "min"
 
+    # --- GPU / performa ---
+    mixed_precision: Literal["float32", "mixed_float16", "mixed_bfloat16"] = "mixed_float16"
+    multi_gpu: bool = True
+    auto_scale_batch_size: bool = True
+    use_tf_data: bool = True
+    prefetch: bool = True
+    memory_growth: bool = True
+    steps_per_execution: int = 10
+
     # --- Reproducibility ---
     seed: int = 42
     deterministic: bool = True
@@ -192,6 +201,13 @@ class BiLSTMConfig:
         _require(self.monitor_mode in ("min", "max"), "monitor_mode harus 'min' atau 'max'.")
         _require(self.seed >= 0, "seed tidak boleh negatif.")
         _require(isinstance(self.deterministic, bool), "deterministic harus boolean.")
+        _require(
+            self.mixed_precision in ("float32", "mixed_float16", "mixed_bfloat16"),
+            "mixed_precision harus float32, mixed_float16, atau mixed_bfloat16.",
+        )
+        for name in ("multi_gpu", "auto_scale_batch_size", "use_tf_data", "prefetch", "memory_growth"):
+            _require(isinstance(getattr(self, name), bool), f"{name} harus boolean.")
+        _require(self.steps_per_execution >= 1, "steps_per_execution harus >= 1.")
         if self.monitor == "val_loss":
             _require(self.monitor_mode == "min", "monitor val_loss harus memakai mode 'min'.")
         else:
@@ -233,6 +249,15 @@ class BertConfig:
     precision: Literal["fp32", "fp16", "bf16"] = "fp32"
     group_by_length: bool = False
     dataloader_num_workers: int = 0
+    dataloader_pin_memory: bool = True
+    dataloader_persistent_workers: bool = False
+    tf32: bool = True
+    gradient_checkpointing: bool = False
+    ddp_find_unused_parameters: bool = False
+    ddp_backend: str | None = None
+    ddp_timeout: int = 1800
+    torch_compile: bool = False
+    auto_find_batch_size: bool = False
     save_total_limit: int = 2
     logging_steps: int = 50
     seed: int = 42
@@ -281,6 +306,17 @@ class BertConfig:
         # greater_is_better diturunkan dari nama metrik agar tidak bisa tidak konsisten.
         self.greater_is_better = not self.metric_for_best_model.endswith("loss")
         _require(self.dataloader_num_workers >= 0, "dataloader_num_workers tidak boleh negatif.")
+        for name in (
+            "dataloader_pin_memory", "dataloader_persistent_workers", "tf32",
+            "gradient_checkpointing", "ddp_find_unused_parameters",
+            "torch_compile", "auto_find_batch_size",
+        ):
+            _require(isinstance(getattr(self, name), bool), f"{name} harus boolean.")
+        _require(self.ddp_timeout > 0, "ddp_timeout harus > 0.")
+        _require(
+            self.ddp_backend in (None, "nccl", "gloo", "mpi", "ccl", "hccl"),
+            "ddp_backend harus None, nccl, gloo, mpi, ccl, atau hccl.",
+        )
         _require(self.save_total_limit >= 0, "save_total_limit tidak boleh negatif.")
         _require(self.logging_steps > 0, "logging_steps harus > 0.")
         _require(self.seed >= 0, "seed tidak boleh negatif.")

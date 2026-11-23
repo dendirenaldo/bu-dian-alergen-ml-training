@@ -20,6 +20,7 @@ from app.experiment.artifacts import create_run_dir, write_json
 from app.experiment.bert_pipeline import run_bert_trial, train_final_bert
 from app.experiment.configs import BertConfig, DataConfig, HPOConfig
 from app.experiment.data_pipeline import prepare_data
+from app.experiment.gpu import distributed_world_size
 from app.experiment.hpo import HPOEngine
 from app.experiment.search_spaces import bert_search_space, preset_trials
 
@@ -47,6 +48,12 @@ def main(
     output_dir: str,
     retrain_best: bool,
 ) -> None:
+    if distributed_world_size() > 1:
+        raise click.UsageError(
+            "HPO BERT berjalan sequential (satu trial satu proses). "
+            "Untuk memakai banyak GPU, jalankan beberapa proses tune_bert.py "
+            "dengan CUDA_VISIBLE_DEVICES berbeda dan output-dir berbeda."
+        )
     from app.repro import apply_reproducibility_lock, seed_all
 
     apply_reproducibility_lock(seed)

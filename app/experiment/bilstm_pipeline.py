@@ -314,7 +314,6 @@ def run_bilstm_trial(
     from app.repro import apply_reproducibility_lock, seed_all
 
     apply_reproducibility_lock(config.seed, deterministic=config.deterministic)
-    seed_all(config.seed, deterministic=config.deterministic)
 
     try:
         import tensorflow as tf
@@ -333,32 +332,63 @@ def run_bilstm_trial(
     vectorized.oov_table.to_csv(out / "oov_audit.csv", index=False)
 
     from app.core.model.architecture import build_model
-
-    tf.keras.backend.clear_session()
-    model = build_model(
-        config.use_bidirectional,
-        config.lstm_units_1,
-        config.lstm_units_2,
-        config.dropout_1,
-        config.dropout_2,
-        config.learning_rate,
-        vectorized.num_words,
-        config.embed_dim,
-        vectorized.embedding_matrix,
-        embed_trainable=config.embed_trainable,
-        recurrent_dropout=config.recurrent_dropout,
-        dense_units=config.dense_units,
-        dropout_rate_dense=config.dropout_dense,
-        gradient_clip_norm=config.gradient_clip_norm,
-        mask_zero=config.mask_zero,
-        use_maxnorm=config.use_maxnorm,
-        rnn_type=config.rnn_type,
-        num_rnn_layers=config.num_rnn_layers,
-        optimizer=config.optimizer,
-        weight_decay=config.weight_decay,
-        maxnorm_value=config.maxnorm_value,
-        label_smoothing=config.label_smoothing,
+    from app.experiment.gpu import (
+        configure_gpu,
+        effective_batch_size,
+        get_strategy,
+        replica_count,
+        set_mixed_precision,
     )
+
+    # --- GPU setup (RTX 3080 Ti: Ampere, FP16, 12 GB VRAM) -------------
+    # configure_gpu harus dipanggil sebelum operasi GPU lain agar memory growth
+    # masih bisa diatur.
+    gpu_info = configure_gpu(config.memory_growth)
+    tf.keras.backend.clear_session()
+    seed_all(config.seed, deterministic=config.deterministic)
+    policy = config.mixed_precision
+    if gpu_info["gpu_count"] == 0 and policy != "float32":
+        logger.warning(
+            "Mixed precision %s diminta tetapi GPU tidak tersedia; memakai float32.",
+            policy,
+        )
+        policy = "float32"
+    set_mixed_precision(policy)
+    strategy = get_strategy(config.multi_gpu)
+    replicas = replica_count(strategy)
+    train_batch_size = effective_batch_size(
+        config.batch_size, replicas, config.auto_scale_batch_size
+    )
+    logger.info(
+        "GPU=%d replicas=%d mixed_precision=%s batch_per_replica=%d batch_global=%d",
+        gpu_info["gpu_count"], replicas, policy, config.batch_size, train_batch_size,
+    )
+
+    with strategy.scope():
+        model = build_model(
+            config.use_bidirectional,
+            config.lstm_units_1,
+            config.lstm_units_2,
+            config.dropout_1,
+            config.dropout_2,
+            config.learning_rate,
+            vectorized.num_words,
+            config.embed_dim,
+            vectorized.embedding_matrix,
+            embed_trainable=config.embed_trainable,
+            recurrent_dropout=config.recurrent_dropout,
+            dense_units=config.dense_units,
+            dropout_rate_dense=config.dropout_dense,
+            gradient_clip_norm=config.gradient_clip_norm,
+            mask_zero=config.mask_zero,
+            use_maxnorm=config.use_maxnorm,
+            rnn_type=config.rnn_type,
+            num_rnn_layers=config.num_rnn_layers,
+            optimizer=config.optimizer,
+            weight_decay=config.weight_decay,
+            maxnorm_value=config.maxnorm_value,
+            label_smoothing=config.label_smoothing,
+        )
 
     X_train = vectorized.X_train
     y_train = vectorized.y_train
@@ -368,6 +398,34 @@ def run_bilstm_trial(
         X_train, y_train = X_train[perm], y_train[perm]
 
     class_weight = _class_weight(y_train) if config.use_class_weight else None
+    sample_weight = None
+    if class_weight is not None:
+        sample_weight = np.asarray(
+            [class_weight[int(label)] for label in y_train], dtype="float32"
+        )
+
+    def _dataset(
+        X: np.ndarray,
+        y: np.ndarray,
+        batch_size: int,
+        shuffle: bool,
+        weights: np.ndarray | None = None,
+    ):
+        if weights is not None:
+            dataset = tf.data.Dataset.from_tensor_slices((X, y, weights))
+        else:
+            dataset = tf.data.Dataset.from_tensor_slices((X, y))
+        if shuffle:
+            dataset = dataset.shuffle(
+                buffer_size=min(len(y), 10000),
+                seed=config.seed,
+                reshuffle_each_iteration=True,
+            )
+        dataset = dataset.batch(batch_size, drop_remainder=False)
+        if config.prefetch:
+            dataset = dataset.prefetch(tf.data.AUTOTUNE)
+        return dataset
+
     checkpoint_path = Path(model_save_path) if model_save_path else out / "model.keras"
     callbacks = [
         EarlyStopping(
@@ -395,24 +453,56 @@ def run_bilstm_trial(
             )
         )
 
-    started = time.time()
-    history = model.fit(
-        X_train,
-        y_train,
-        validation_data=(vectorized.X_val, vectorized.y_val),
-        epochs=config.epochs,
-        batch_size=config.batch_size,
-        callbacks=callbacks,
-        shuffle=config.shuffle,
-        class_weight=class_weight,
-        verbose=verbose,
+    fit_extra = (
+        {"steps_per_execution": config.steps_per_execution}
+        if config.steps_per_execution > 1 else {}
     )
+    started = time.time()
+    if config.use_tf_data:
+        train_ds = _dataset(
+            X_train, y_train, train_batch_size, config.shuffle, sample_weight
+        )
+        val_ds = _dataset(
+            vectorized.X_val, vectorized.y_val, train_batch_size, False
+        )
+        history = model.fit(
+            train_ds,
+            validation_data=val_ds,
+            epochs=config.epochs,
+            callbacks=callbacks,
+            verbose=verbose,
+            **fit_extra,
+        )
+    else:
+        history = model.fit(
+            X_train,
+            y_train,
+            validation_data=(vectorized.X_val, vectorized.y_val),
+            epochs=config.epochs,
+            batch_size=train_batch_size,
+            callbacks=callbacks,
+            shuffle=config.shuffle,
+            class_weight=class_weight,
+            verbose=verbose,
+            **fit_extra,
+        )
     train_seconds = time.time() - started
 
-    val_prob = np.asarray(model.predict(vectorized.X_val, verbose=0)).ravel()
+    if config.use_tf_data:
+        val_prob = np.asarray(model.predict(val_ds, verbose=0)).ravel()
+    else:
+        val_prob = np.asarray(model.predict(vectorized.X_val, verbose=0)).ravel()
     holdout_prob: np.ndarray | None = None
     if evaluate_holdout:
-        holdout_prob = np.asarray(model.predict(vectorized.X_holdout, verbose=0)).ravel()
+        if config.use_tf_data:
+            holdout_ds = _dataset(
+                vectorized.X_holdout, vectorized.y_holdout, train_batch_size, False
+            )
+            holdout_prob = np.asarray(model.predict(holdout_ds, verbose=0)).ravel()
+        else:
+            holdout_prob = np.asarray(
+                model.predict(vectorized.X_holdout, verbose=0)
+            ).ravel()
 
     val_metrics = classification_metrics(vectorized.y_val, val_prob)
     holdout_metrics = (
@@ -431,6 +521,9 @@ def run_bilstm_trial(
         "train_seconds": float(train_seconds),
         "w2v_coverage": float(vectorized.w2v_coverage),
         "num_words": float(vectorized.num_words),
+        "gpu_count": float(gpu_info["gpu_count"]),
+        "replicas": float(replicas),
+        "effective_batch_size": float(train_batch_size),
     }
     write_json(out / "metrics.json", metrics)
     write_json(
@@ -442,6 +535,15 @@ def run_bilstm_trial(
             "monitor": config.monitor,
             "monitor_mode": config.monitor_mode,
             "class_weight": class_weight,
+            "gpu": {
+                **gpu_info,
+                "mixed_precision": policy,
+                "replicas": replicas,
+                "batch_per_replica": config.batch_size,
+                "effective_batch_size": train_batch_size,
+                "steps_per_execution": config.steps_per_execution,
+                "use_tf_data": config.use_tf_data,
+            },
             "config": config.to_dict(),
         },
     )

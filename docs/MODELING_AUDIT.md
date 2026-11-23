@@ -318,7 +318,7 @@ hanya diprediksi sekali". Perbaikan:
 
 | Pemeriksaan | Hasil |
 |---|---|
-| `pytest -q` | 47 passed, 1 skipped (48 collected) |
+| `pytest -q` | 48 passed, 1 skipped (49 collected) |
 | Import modul baru tanpa TF/Torch | PASS |
 | Notebook JSON + syntax | PASS (7 notebook) |
 | Data pipeline dengan CSV 499 baris | PASS, split 399/50/50 |
@@ -382,7 +382,7 @@ model.
 
 | Proyek | Pemeriksaan | Hasil |
 |---|---|---|
-| `bu-dian-alergen-ml-training` | `pytest`, `pyflakes`, compile, notebook syntax | PASS (47 test, 1 skip) |
+| `bu-dian-alergen-ml-training` | `pytest`, `pyflakes`, compile, notebook syntax | PASS (48 test, 1 skip) |
 | `bu-dian-alergen-ml-service` | `pyflakes`, `compileall` | PASS |
 | `bu-dian-alergen-backend` | `npm run typecheck`, `npm run test:unit` | PASS (40 test) |
 | `bu-dian-alergen-web` | `npm run typecheck`, `npm test` | PASS (56 test) |
@@ -447,8 +447,91 @@ Node: 'UnsortedSegmentSum_5'
 ### 12.4 Validasi
 
 - `pyflakes` seluruh Python: PASS.
-- `pytest`: 47 passed, 1 skipped.
+- `pytest`: 48 passed, 1 skipped.
 - Syntax 7 notebook: PASS.
 - Eksekusi GPU sebenarnya belum bisa dilakukan di environment audit; namun
   seluruh pemanggilan `tf.keras.metrics.AUC/Precision/Recall` sudah dihapus
   dari jalur training.
+
+---
+
+## 13. Audit GPU & Multi-GPU (RTX 3080 Ti)
+
+Target hardware: **RTX 3080 Ti** (Ampere, compute capability 8.6,
+12 GB VRAM, Tensor Core FP16/TF32, tanpa NVLink untuk multi-GPU).
+
+### 13.1 Temuan sebelum perbaikan
+
+| ID | Severity | Temuan | Dampak |
+|---|---|---|---|
+| G1 | P1 | Tidak ada `set_memory_growth`; TF bisa mengambil seluruh VRAM | Proses lain/GPU kedua tidak mendapat memori |
+| G2 | P1 | Tidak ada mixed precision | FP16 Tensor Core 3080 Ti tidak terpakai |
+| G3 | P1 | BiLSTM tidak memakai `MirroredStrategy` | Multi-GPU tidak terpakai sama sekali |
+| G4 | P1 | Training memakai array NumPy langsung, tanpa `tf.data`/prefetch | Data pipeline jadi bottleneck |
+| G5 | P1 | Batch size tidak diskalakan untuk multi-GPU | Batch per GPU terlalu kecil, scaling buruk |
+| G6 | P1 | BERT DDP menulis artefak dari semua rank | Race condition pada `metrics.json`/`probs_*.csv`/model |
+| G7 | P1 | HPO BERT bisa dijalankan lewat `accelerate launch` | Setiap proses menjalankan HPO sendiri (duplikasi/race) |
+| G8 | P2 | `TrainingArguments` belum memakai TF32, pin memory, gradient checkpointing, fused optimizer, auto batch size | GPU 3080 Ti tidak dimanfaatkan optimal |
+| G9 | P2 | Tidak ada panduan VRAM 12 GB / multi-GPU | Pengguna mudah OOM atau salah konfigurasi |
+
+### 13.2 Perbaikan
+
+- `app/experiment/gpu.py`:
+  - `configure_gpu()` — memory growth.
+  - `set_mixed_precision()` — FP16/BF16.
+  - `get_strategy()` — `MirroredStrategy` otomatis untuk >1 GPU.
+  - `effective_batch_size()` — batch global = batch per GPU × replika.
+  - `is_main_process()` / `distributed_world_size()` — guard DDP.
+- `BiLSTMConfig`:
+  - `mixed_precision="mixed_float16"`, `multi_gpu=True`,
+    `auto_scale_batch_size=True`, `use_tf_data=True`, `prefetch=True`,
+    `memory_growth=True`, `steps_per_execution=10`.
+- `run_bilstm_trial()`:
+  - Build/compile model di dalam `strategy.scope()`.
+  - `tf.data` + shuffle + prefetch; class weight sebagai sample weight.
+  - Output layer `float32`; metric custom deterministik.
+  - Mencatat `gpu_count`, `replicas`, `effective_batch_size`,
+    `mixed_precision` di `metrics.json`/`training_summary.json`.
+- `BertConfig` + `TrainingArguments`:
+  - `tf32`, `dataloader_pin_memory`, `dataloader_persistent_workers`,
+    `gradient_checkpointing`, `ddp_find_unused_parameters`, `ddp_timeout`,
+    `torch_compile`, `auto_find_batch_size`.
+  - `adamw_torch_fused` fallback ke `adamw_torch` bila tidak ada CUDA.
+  - Gradient checkpointing diaktifkan pada model bila diminta.
+- DDP:
+  - Hanya rank 0 menulis `metrics.json`, `probs_*.csv`, `roc_data.json`,
+    `model_card.json`, dan model BERT.
+  - `scripts/train_bert.py` memakai `save_artifacts=is_main_process()`.
+  - `scripts/tune_bert.py` dan `scripts/tune_bilstm.py` menolak dijalankan
+    dengan world size > 1 karena HPO harus single-process.
+- Dokumentasi: `docs/GPU_OPTIMIZATION.md` berisi profil 3080 Ti, panduan
+  VRAM, perintah single/multi-GPU, dan troubleshooting.
+
+### 13.3 Semantik batch
+
+| Model | Field | Arti |
+|---|---|---|
+| BiLSTM | `batch_size` | per GPU; global = batch × jumlah GPU (jika `auto_scale_batch_size=True`) |
+| IndoBERT | `batch_size` | `per_device_train_batch_size`; global = batch × jumlah proses × `gradient_accumulation_steps` |
+
+### 13.4 Status validasi
+
+- `pyflakes` seluruh Python: PASS.
+- `pytest`: 48 passed, 1 skipped.
+- Syntax 7 notebook: PASS.
+- Eksekusi notebook ringan/mock: PASS.
+- **Benchmark GPU sebenarnya belum dijalankan di environment audit** karena
+  tidak ada GPU. Pengguna perlu menjalankan smoke test di RTX 3080 Ti dan
+  mencatat waktu/VRAM.
+
+### 13.5 Rekomendasi untuk 3080 Ti
+
+- BiLSTM: `mixed_float16`, batch 32–64 per GPU, `max_len` 120–160.
+- IndoBERT base: `precision="fp16"`, `tf32=True`,
+  `optimizer="adamw_torch_fused"`, batch 16 per GPU, `max_len=256`.
+- Jika OOM: turunkan batch/`max_len`, aktifkan `gradient_checkpointing`,
+  atau `auto_find_batch_size=True`.
+- Multi-GPU BERT: `accelerate launch --multi_gpu --num_processes 2`,
+  batch per GPU 8–16, backend `gloo` bila NCCL tidak tersedia (Windows).
+- HPO BERT multi-GPU: jalankan dua proses `tune_bert.py` dengan
+  `CUDA_VISIBLE_DEVICES=0` dan `=1`, bukan DDP.

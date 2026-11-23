@@ -26,6 +26,7 @@ import pandas as pd
 from app.experiment.artifacts import environment_snapshot, write_json
 from app.experiment.configs import BertConfig
 from app.experiment.data_pipeline import DataBundle
+from app.experiment.gpu import distributed_world_size, is_main_process
 from app.experiment.reporting import bootstrap_ci, classification_metrics
 
 logger = logging.getLogger(__name__)
@@ -211,16 +212,22 @@ def _build_training_arguments(config: BertConfig, output_dir: Path, train_size: 
 
     supported = set(inspect.signature(TrainingArguments.__init__).parameters)
 
+    import torch
+
+    cuda_available = torch.cuda.is_available()
     precision = config.precision
     if precision != "fp32":
-        import torch
-
-        if not torch.cuda.is_available():
+        if not cuda_available:
             logger.warning("Presisi %s diminta tetapi CUDA tidak tersedia; memakai fp32.", precision)
             precision = "fp32"
         elif precision == "bf16" and not torch.cuda.is_bf16_supported():
             logger.warning("bf16 tidak didukung GPU ini; memakai fp16.")
             precision = "fp16"
+
+    optimizer = config.optimizer
+    if optimizer == "adamw_torch_fused" and not cuda_available:
+        logger.warning("adamw_torch_fused membutuhkan CUDA; memakai adamw_torch.")
+        optimizer = "adamw_torch"
 
     kwargs: dict[str, Any] = {
         "output_dir": str(output_dir / "checkpoints"),
@@ -232,7 +239,7 @@ def _build_training_arguments(config: BertConfig, output_dir: Path, train_size: 
         "max_grad_norm": config.max_grad_norm,
         "gradient_accumulation_steps": config.gradient_accumulation_steps,
         "lr_scheduler_type": config.lr_scheduler_type,
-        "optim": config.optimizer,
+        "optim": optimizer,
         "save_strategy": "epoch",
         "load_best_model_at_end": True,
         "metric_for_best_model": config.metric_for_best_model,
@@ -243,6 +250,18 @@ def _build_training_arguments(config: BertConfig, output_dir: Path, train_size: 
         "report_to": "none",
         "group_by_length": config.group_by_length,
         "dataloader_num_workers": config.dataloader_num_workers,
+        "dataloader_pin_memory": config.dataloader_pin_memory,
+        "dataloader_persistent_workers": (
+            config.dataloader_persistent_workers and config.dataloader_num_workers > 0
+        ),
+        # Ampere (RTX 3080 Ti) mendapat percepatan dari TF32.
+        "tf32": bool(config.tf32 and cuda_available),
+        "gradient_checkpointing": config.gradient_checkpointing,
+        "ddp_find_unused_parameters": config.ddp_find_unused_parameters,
+        "ddp_backend": config.ddp_backend,
+        "ddp_timeout": config.ddp_timeout,
+        "torch_compile": config.torch_compile,
+        "auto_find_batch_size": config.auto_find_batch_size,
         "label_smoothing_factor": 0.0,  # ditangani WeightedTrainer
     }
     if config.save_total_limit > 0:
@@ -305,6 +324,7 @@ def run_bert_trial(
 
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
+    main_process = is_main_process()
 
     tokenizer = AutoTokenizer.from_pretrained(config.model_name, use_fast=True)
     model_config = AutoConfig.from_pretrained(
@@ -322,6 +342,11 @@ def run_bert_trial(
     model = AutoModelForSequenceClassification.from_pretrained(
         config.model_name, config=model_config
     )
+    if config.gradient_checkpointing:
+        if hasattr(model, "gradient_checkpointing_enable"):
+            model.gradient_checkpointing_enable()
+        if hasattr(model.config, "use_cache"):
+            model.config.use_cache = False
     freeze_info = _freeze_layers(model, config.freeze_layers)
 
     tr_enc = _encode(tokenizer, bundle.X_train_text, config.max_len)
@@ -366,7 +391,8 @@ def run_bert_trial(
     trainer.train()
     train_seconds = time.time() - started
     history = list(trainer.state.log_history)
-    write_json(out / "training_log.json", history)
+    if main_process:
+        write_json(out / "training_log.json", history)
 
     def _predict(
         active_trainer: Any,
@@ -385,6 +411,10 @@ def run_bert_trial(
         prob = (exp / exp.sum(axis=1, keepdims=True))[:, 1]
         return np.asarray(y).astype(int), prob, float(prediction.metrics.get("test_loss", float("nan")))
 
+    gpu_count = int(torch.cuda.device_count()) if torch.cuda.is_available() else 0
+    gpu_names = [
+        str(torch.cuda.get_device_name(index)) for index in range(gpu_count)
+    ]
     y_val, val_prob, val_loss = _predict(trainer, bundle.X_val_text, bundle.y_val)
     y_hold = None
     hold_prob = None
@@ -411,21 +441,36 @@ def run_bert_trial(
             else "bf16" if getattr(training_args, "bf16", False)
             else "fp32"
         ),
+        "gpu_count": float(gpu_count),
+        "gpu_names": ",".join(gpu_names),
+        "world_size": float(distributed_world_size()),
+        "gradient_checkpointing": bool(config.gradient_checkpointing),
+        "tf32": bool(getattr(training_args, "tf32", False)),
         **freeze_info,
     }
     if evaluate_holdout:
         metrics["holdout_loss"] = hold_loss
-    write_json(out / "metrics.json", metrics)
-    write_json(
-        out / "training_summary.json",
-        {
-            "train_seconds": train_seconds,
-            "epochs_ran": trainer.state.epoch,
-            "best_checkpoint": trainer.state.best_model_checkpoint,
-            "freeze_info": freeze_info,
-            "config": config.to_dict(),
-        },
-    )
+    if main_process:
+        write_json(out / "metrics.json", metrics)
+        write_json(
+            out / "training_summary.json",
+            {
+                "train_seconds": train_seconds,
+                "epochs_ran": trainer.state.epoch,
+                "best_checkpoint": trainer.state.best_model_checkpoint,
+                "freeze_info": freeze_info,
+                "gpu": {
+                    "gpu_count": gpu_count,
+                    "gpu_names": gpu_names,
+                    "world_size": distributed_world_size(),
+                    "precision_used": metrics["precision_used"],
+                    "tf32": bool(getattr(training_args, "tf32", False)),
+                    "gradient_checkpointing": bool(config.gradient_checkpointing),
+                    "dataloader_num_workers": config.dataloader_num_workers,
+                },
+                "config": config.to_dict(),
+            },
+        )
 
     artifacts: dict[str, str] = {
         "metrics": str(out / "metrics.json"),
@@ -440,8 +485,9 @@ def run_bert_trial(
                 "prob_unsafe": val_prob.astype(float),
             }
         )
-        val_df.to_csv(out / "probs_val.csv", index=False)
-        artifacts["probs_val"] = str(out / "probs_val.csv")
+        if main_process:
+            val_df.to_csv(out / "probs_val.csv", index=False)
+            artifacts["probs_val"] = str(out / "probs_val.csv")
         if hold_prob is not None and y_hold is not None:
             hold_df = pd.DataFrame(
                 {
@@ -451,8 +497,9 @@ def run_bert_trial(
                     "prob_unsafe": hold_prob.astype(float),
                 }
             )
-            hold_df.to_csv(out / "probs_holdout.csv", index=False)
-            artifacts["probs_holdout"] = str(out / "probs_holdout.csv")
+            if main_process:
+                hold_df.to_csv(out / "probs_holdout.csv", index=False)
+                artifacts["probs_holdout"] = str(out / "probs_holdout.csv")
         from sklearn.metrics import roc_curve
 
         roc_payload = {}
@@ -461,10 +508,11 @@ def run_bert_trial(
                 continue
             fpr, tpr, _ = roc_curve(y_true, prob)
             roc_payload[name] = {"fpr": fpr.tolist(), "tpr": tpr.tolist()}
-        write_json(out / "roc_data.json", roc_payload)
-        artifacts["roc_data"] = str(out / "roc_data.json")
+        if main_process:
+            write_json(out / "roc_data.json", roc_payload)
+            artifacts["roc_data"] = str(out / "roc_data.json")
 
-    if save_model:
+    if save_model and main_process:
         model_dir = out / "model"
         trainer.save_model(str(model_dir))
         tokenizer.save_pretrained(str(model_dir))
@@ -479,7 +527,7 @@ def run_bert_trial(
             },
         )
         artifacts["model"] = str(model_dir)
-    else:
+    elif not save_model and main_process:
         # HPO tidak butuh checkpoint per trial; hapus agar disk tidak penuh.
         import shutil
 
@@ -516,12 +564,22 @@ def train_final_bert(
     """Latih IndoBERT final dan simpan artefak kompatibel dengan paper lama."""
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
+    main_process = is_main_process()
     result = run_bert_trial(
         bundle, config, out,
         save_model=True, save_predictions=True, verbose=verbose,
     )
 
     assert result.holdout_prob is not None, "Training final wajib mengevaluasi holdout."
+    if main_process:
+        assert len(result.val_prob) == len(bundle.y_val), (
+            "Prediksi validasi tidak lengkap. Pada DDP, pastikan predictions "
+            "digabung antar-rank (Trainer.predict) atau jalankan single-GPU."
+        )
+        assert len(result.holdout_prob) == len(bundle.y_holdout), (
+            "Prediksi holdout tidak lengkap. Pada DDP, pastikan predictions "
+            "digabung antar-rank (Trainer.predict) atau jalankan single-GPU."
+        )
     validation = {
         key.replace("val_", ""): value
         for key, value in result.metrics.items()
@@ -546,42 +604,43 @@ def train_final_bert(
         "hpo": hpo_info or {},
         "environment": environment_snapshot(seed=config.seed),
     }
-    write_json(out / "metrics.json", metrics)
-    write_json(out / "threshold.json", {"threshold": 0.5, "fixed": True})
-    write_json(
-        out / "model_card.json",
-        {
-            "model_name": config.model_name,
-            "config": config.to_dict(),
-            "metrics": metrics,
-            "data": {
-                "csv_sha256": bundle.metadata.get("csv_sha256"),
-                "frozen_holdout_sha256": bundle.frozen_sha256,
-                "pool_sizes": bundle.pool_sizes,
+    if main_process:
+        write_json(out / "metrics.json", metrics)
+        write_json(out / "threshold.json", {"threshold": 0.5, "fixed": True})
+        write_json(
+            out / "model_card.json",
+            {
+                "model_name": config.model_name,
+                "config": config.to_dict(),
+                "metrics": metrics,
+                "data": {
+                    "csv_sha256": bundle.metadata.get("csv_sha256"),
+                    "frozen_holdout_sha256": bundle.frozen_sha256,
+                    "pool_sizes": bundle.pool_sizes,
+                },
+                "environment": environment_snapshot(seed=config.seed),
             },
-            "environment": environment_snapshot(seed=config.seed),
-        },
-    )
+        )
 
-    # Tabel evaluasi + bootstrap CI.
-    rows = []
-    for split_name, y_true, y_prob, split_metrics in (
-        ("validation", bundle.y_val, result.val_prob, validation),
-        ("frozen_holdout", bundle.y_holdout, result.holdout_prob, holdout),
-    ):
-        row = {"split": split_name, **split_metrics}
-        rows.append(row)
-    pd.DataFrame(rows).to_csv(out / "evaluation_table_bert.csv", index=False)
+        # Tabel evaluasi + bootstrap CI.
+        rows = []
+        for split_name, y_true, y_prob, split_metrics in (
+            ("validation", bundle.y_val, result.val_prob, validation),
+            ("frozen_holdout", bundle.y_holdout, result.holdout_prob, holdout),
+        ):
+            row = {"split": split_name, **split_metrics}
+            rows.append(row)
+        pd.DataFrame(rows).to_csv(out / "evaluation_table_bert.csv", index=False)
 
-    ci_rows = []
-    for split_name, y_true, y_prob in (
-        ("validation", bundle.y_val, result.val_prob),
-        ("frozen_holdout", bundle.y_holdout, result.holdout_prob),
-    ):
-        table = bootstrap_ci(y_true, y_prob, threshold=0.5, n_bootstrap=2000, seed=config.seed)
-        table.insert(0, "split", split_name)
-        ci_rows.append(table)
-    pd.concat(ci_rows, ignore_index=True).to_csv(out / "bootstrap_ci_bert.csv", index=False)
+        ci_rows = []
+        for split_name, y_true, y_prob in (
+            ("validation", bundle.y_val, result.val_prob),
+            ("frozen_holdout", bundle.y_holdout, result.holdout_prob),
+        ):
+            table = bootstrap_ci(y_true, y_prob, threshold=0.5, n_bootstrap=2000, seed=config.seed)
+            table.insert(0, "split", split_name)
+            ci_rows.append(table)
+        pd.concat(ci_rows, ignore_index=True).to_csv(out / "bootstrap_ci_bert.csv", index=False)
 
     return {
         "metrics": metrics,

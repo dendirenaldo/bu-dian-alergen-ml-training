@@ -233,3 +233,25 @@ def test_hpo_menolak_metrik_holdout(tmp_path):
     assert result.trials[0].status == "failed"
     assert "holdout" in (result.trials[0].error or "")
     assert result.best is None
+
+
+def test_gpu_config_dan_effective_batch_size():
+    from app.experiment.gpu import effective_batch_size
+
+    assert effective_batch_size(16, 1, True) == 16
+    assert effective_batch_size(16, 2, True) == 32
+    assert effective_batch_size(16, 2, False) == 16
+    with pytest.raises(ValueError):
+        effective_batch_size(0, 2, True)
+
+    cfg = BiLSTMConfig(mixed_precision="mixed_float16", multi_gpu=True)
+    assert cfg.steps_per_execution >= 1
+    with pytest.raises(ConfigError):
+        BiLSTMConfig(mixed_precision="int8")
+    with pytest.raises(ConfigError):
+        BiLSTMConfig(steps_per_execution=0)
+
+    bert = BertConfig(tf32=True, gradient_checkpointing=True, auto_find_batch_size=True)
+    assert bert.tf32 is True
+    with pytest.raises(ConfigError):
+        BertConfig(ddp_timeout=0)

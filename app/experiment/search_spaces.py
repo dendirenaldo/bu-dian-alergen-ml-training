@@ -435,6 +435,7 @@ def bert_search_space(preset: str = "standard") -> SearchSpace:
             lr_scheduler_type=Categorical(("linear", "cosine")),
             freeze_layers=Categorical((0, -1)),
             metric_for_best_model=Categorical(("eval_loss", "eval_f1")),
+            precision=Categorical(("fp16", "fp32")),
         )
     if preset == "standard":
         return _space(
