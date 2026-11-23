@@ -473,6 +473,7 @@ Target hardware: **RTX 3080 Ti** (Ampere, compute capability 8.6,
 | G7 | P1 | HPO BERT bisa dijalankan lewat `accelerate launch` | Setiap proses menjalankan HPO sendiri (duplikasi/race) |
 | G8 | P2 | `TrainingArguments` belum memakai TF32, pin memory, gradient checkpointing, fused optimizer, auto batch size | GPU 3080 Ti tidak dimanfaatkan optimal |
 | G9 | P2 | Tidak ada panduan VRAM 12 GB / multi-GPU | Pengguna mudah OOM atau salah konfigurasi |
+| G10 | P1 | `MirroredStrategy` memilih NCCL di Windows, padahal TensorFlow Windows tidak punya kernel `NcclAllReduce` | Training 2 GPU gagal dengan `InvalidArgumentError` |
 
 ### 13.2 Perbaikan
 
@@ -480,6 +481,9 @@ Target hardware: **RTX 3080 Ti** (Ampere, compute capability 8.6,
   - `configure_gpu()` — memory growth.
   - `set_mixed_precision()` — FP16/BF16.
   - `get_strategy()` — `MirroredStrategy` otomatis untuk >1 GPU.
+    `cross_device_ops="auto"` memakai NCCL di Linux dan
+    `ReductionToOneDevice` di Windows; bisa dipaksa `nccl`, `hierarchical`,
+    atau `reduction_to_one`.
   - `effective_batch_size()` — batch global = batch per GPU × replika.
   - `is_main_process()` / `distributed_world_size()` — guard DDP.
 - `BiLSTMConfig`:

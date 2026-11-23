@@ -29,6 +29,7 @@ from app.experiment.gpu import distributed_world_size
 @click.option("--max-len", type=int, default=None)
 @click.option("--steps-per-execution", type=int, default=None)
 @click.option("--multi-gpu/--single-gpu", default=True)
+@click.option("--cross-device-ops", type=click.Choice(["auto", "nccl", "hierarchical", "reduction_to_one"]), default=None)
 @click.option("--tf-data/--no-tf-data", default=True)
 def main(
     csv_input: str,
@@ -43,6 +44,7 @@ def main(
     max_len: int | None,
     steps_per_execution: int | None,
     multi_gpu: bool,
+    cross_device_ops: str | None,
     tf_data: bool,
 ) -> None:
     if distributed_world_size() > 1:
@@ -81,6 +83,8 @@ def main(
     if steps_per_execution is not None:
         config.steps_per_execution = steps_per_execution
     config.multi_gpu = multi_gpu
+    if cross_device_ops is not None:
+        config.cross_device_ops = cross_device_ops
     config.use_tf_data = tf_data
 
     output = train_final_bilstm(

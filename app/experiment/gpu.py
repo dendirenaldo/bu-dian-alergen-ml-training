@@ -7,11 +7,12 @@ modul ini tetap bisa diimpor di environment tanpa GPU/TensorFlow.
 from __future__ import annotations
 
 import os
+import platform
 from typing import Any
 
 _GPU_CONFIGURED = False
 _STRATEGY = None
-_STRATEGY_KEY: tuple[bool, int] | None = None
+_STRATEGY_KEY: tuple[bool, int, str] | None = None
 
 
 def configure_gpu(memory_growth: bool = True) -> dict[str, Any]:
@@ -73,23 +74,47 @@ def set_mixed_precision(policy: str = "mixed_float16") -> str:
     return tf.keras.mixed_precision.global_policy().name
 
 
-def get_strategy(multi_gpu: bool = True):
+def get_strategy(multi_gpu: bool = True, cross_device_ops: str = "auto"):
     """Kembalikan strategy distribusi (di-cache agar HPO tidak re-init NCCL).
 
     MirroredStrategy melakukan all-reduce gradien antar GPU (data parallel).
     Untuk satu GPU, default strategy menghindari overhead distribusi.
+
+    Args:
+        multi_gpu: pakai semua GPU yang terlihat bila >1.
+        cross_device_ops:
+            - ``auto``: NCCL di Linux, ``ReductionToOneDevice`` di Windows
+              (TensorFlow Windows tidak punya kernel NCCL).
+            - ``nccl``: paksa NCCL (Linux + NCCL).
+            - ``hierarchical``: ``HierarchicalCopyAllReduce``.
+            - ``reduction_to_one``: paling kompatibel, sedikit lebih lambat.
     """
     global _STRATEGY, _STRATEGY_KEY
     import tensorflow as tf
 
     gpus = tf.config.list_physical_devices("GPU")
-    key = (bool(multi_gpu), len(gpus))
-    if _STRATEGY is None or _STRATEGY_KEY != key:
-        if multi_gpu and len(gpus) > 1:
-            _STRATEGY = tf.distribute.MirroredStrategy()
+    key = (bool(multi_gpu), len(gpus), str(cross_device_ops))
+    if _STRATEGY is not None and _STRATEGY_KEY == key:
+        return _STRATEGY
+
+    if multi_gpu and len(gpus) > 1:
+        selected = str(cross_device_ops).lower()
+        if selected == "auto":
+            selected = "reduction_to_one" if platform.system() == "Windows" else "nccl"
+        if selected == "nccl":
+            ops = tf.distribute.NcclAllReduce()
+        elif selected == "hierarchical":
+            ops = tf.distribute.HierarchicalCopyAllReduce()
+        elif selected == "reduction_to_one":
+            ops = tf.distribute.ReductionToOneDevice()
         else:
-            _STRATEGY = tf.distribute.get_strategy()
-        _STRATEGY_KEY = key
+            raise ValueError(
+                "cross_device_ops harus auto, nccl, hierarchical, atau reduction_to_one."
+            )
+        _STRATEGY = tf.distribute.MirroredStrategy(cross_device_ops=ops)
+    else:
+        _STRATEGY = tf.distribute.get_strategy()
+    _STRATEGY_KEY = key
     return _STRATEGY
 
 

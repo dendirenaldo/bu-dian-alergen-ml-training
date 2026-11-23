@@ -28,6 +28,7 @@ Default `BiLSTMConfig`:
 |---|---|---|
 | `mixed_precision` | `mixed_float16` | Tensor Core FP16 di 3080 Ti; fallback ke `float32` bila tidak ada GPU |
 | `multi_gpu` | `True` | `MirroredStrategy` dipakai bila terlihat >1 GPU |
+| `cross_device_ops` | `auto` | Di Linux memakai NCCL; di Windows otomatis `ReductionToOneDevice` karena TF Windows tidak punya kernel NCCL |
 | `auto_scale_batch_size` | `True` | `batch_size` dianggap **per GPU**; batch global = batch × jumlah GPU |
 | `use_tf_data` | `True` | Dataset `tf.data` + `prefetch(AUTOTUNE)` |
 | `prefetch` | `True` | Overlap CPU/GPU |
@@ -72,6 +73,17 @@ python scripts/train_bilstm.py --csv-input "..\old\ocr_output\data-mengandung.cs
 ```
 
 `--batch-size 32` berarti 32 per GPU → batch global 64.
+
+Di Windows, default `cross_device_ops="auto"` akan memakai
+`ReductionToOneDevice` agar tidak memicu error `NcclAllReduce`. Jika ingin
+mencoba all-reduce hierarkis:
+
+```powershell
+python scripts/train_bilstm.py ... --cross-device-ops hierarchical
+```
+
+Jika masih gagal, pakai `--cross-device-ops reduction_to_one` atau
+`--single-gpu`.
 
 ### HPO BiLSTM
 
@@ -186,6 +198,7 @@ Jika OOM:
 |---|---|---|
 | `Deterministic GPU implementation ... not available` | Op/metric non-deterministik | Versi ini sudah memakai metric custom; jika tetap muncul set `BiLSTMConfig(deterministic=False)` |
 | `CUDA out of memory` | Batch/seq terlalu besar | Turunkan batch/`max_len`, aktifkan gradient checkpointing/auto batch |
+| `No OpKernel was registered ... NcclAllReduce` | TensorFlow Windows tidak punya NCCL | Gunakan `cross_device_ops="reduction_to_one"` (default `auto` di Windows) atau `multi_gpu=False` |
 | Multi-GPU tidak lebih cepat | Batch per GPU terlalu kecil / PCIe | Naikkan batch per GPU, kurangi overhead data loader |
 | DDP gagal di Windows | NCCL tidak tersedia | Gunakan backend `gloo` |
 | GPU hanya terpakai 1 | `CUDA_VISIBLE_DEVICES` salah | Cek dengan `nvidia-smi` dan `torch.cuda.device_count()` |

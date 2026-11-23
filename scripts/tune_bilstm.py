@@ -40,6 +40,7 @@ from app.experiment.search_spaces import bilstm_search_space, preset_trials
 @click.option("--objective", default="val_f1", help="Metrik seleksi (val_f1/val_roc_auc/val_loss).")
 @click.option("--timeout-minutes", default=None, type=float)
 @click.option("--output-dir", default="./artifacts/hpo/bilstm")
+@click.option("--cross-device-ops", type=click.Choice(["auto", "nccl", "hierarchical", "reduction_to_one"]), default=None)
 @click.option("--retrain-best/--no-retrain-best", default=False)
 def main(
     csv_input: str,
@@ -51,6 +52,7 @@ def main(
     objective: str,
     timeout_minutes: float | None,
     output_dir: str,
+    cross_device_ops: str | None,
     retrain_best: bool,
 ) -> None:
     if distributed_world_size() > 1:
@@ -91,6 +93,8 @@ def main(
 
     def objective_fn(params: dict, trial_index: int, trial_dir) -> dict:
         config = BiLSTMConfig.from_dict(params)
+        if cross_device_ops is not None:
+            config.cross_device_ops = cross_device_ops
         key = vectorizer_key(config)
         vectorized = cache.get(key)
         if vectorized is None:
@@ -117,6 +121,8 @@ def main(
 
     if retrain_best:
         best_config = BiLSTMConfig.from_dict(result.best.params)
+        if cross_device_ops is not None:
+            best_config.cross_device_ops = cross_device_ops
         final_dir = os.path.join(output_dir, "best_model")
         output = train_final_bilstm(
             bundle,

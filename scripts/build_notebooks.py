@@ -564,6 +564,11 @@ Model ini menjadi pembanding untuk hasil HPO di notebook 03.
 **GPU:** pipeline otomatis memakai semua GPU yang terlihat lewat
 `MirroredStrategy`, mixed precision FP16, dan `tf.data`. Pada RTX 3080 Ti
 (12 GB), batch 16–32 dan `max_len` 120–160 biasanya aman.
+
+Di **Windows**, `cross_device_ops="auto"` otomatis memakai
+`ReductionToOneDevice` karena TensorFlow Windows tidak punya kernel NCCL.
+Jika muncul error `NcclAllReduce`, set
+`config.cross_device_ops = "reduction_to_one"` atau `config.multi_gpu = False`.
 """
     ),
     md(

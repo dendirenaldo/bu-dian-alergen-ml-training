@@ -148,6 +148,7 @@ class BiLSTMConfig:
     # --- GPU / performa ---
     mixed_precision: Literal["float32", "mixed_float16", "mixed_bfloat16"] = "mixed_float16"
     multi_gpu: bool = True
+    cross_device_ops: Literal["auto", "nccl", "hierarchical", "reduction_to_one"] = "auto"
     auto_scale_batch_size: bool = True
     use_tf_data: bool = True
     prefetch: bool = True
@@ -207,6 +208,10 @@ class BiLSTMConfig:
         )
         for name in ("multi_gpu", "auto_scale_batch_size", "use_tf_data", "prefetch", "memory_growth"):
             _require(isinstance(getattr(self, name), bool), f"{name} harus boolean.")
+        _require(
+            self.cross_device_ops in ("auto", "nccl", "hierarchical", "reduction_to_one"),
+            "cross_device_ops harus auto, nccl, hierarchical, atau reduction_to_one.",
+        )
         _require(self.steps_per_execution >= 1, "steps_per_execution harus >= 1.")
         if self.monitor == "val_loss":
             _require(self.monitor_mode == "min", "monitor val_loss harus memakai mode 'min'.")

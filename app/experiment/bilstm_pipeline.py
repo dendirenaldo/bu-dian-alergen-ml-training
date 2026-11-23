@@ -354,7 +354,7 @@ def run_bilstm_trial(
         )
         policy = "float32"
     set_mixed_precision(policy)
-    strategy = get_strategy(config.multi_gpu)
+    strategy = get_strategy(config.multi_gpu, config.cross_device_ops)
     replicas = replica_count(strategy)
     train_batch_size = effective_batch_size(
         config.batch_size, replicas, config.auto_scale_batch_size
@@ -554,6 +554,7 @@ def run_bilstm_trial(
                 **gpu_info,
                 "mixed_precision": policy,
                 "replicas": replicas,
+                "cross_device_ops": config.cross_device_ops,
                 "batch_per_replica": config.batch_size,
                 "effective_batch_size": train_batch_size,
                 "steps_per_execution": fit_extra.get("steps_per_execution", 1),
