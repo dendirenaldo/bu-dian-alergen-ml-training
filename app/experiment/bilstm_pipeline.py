@@ -19,6 +19,7 @@ import json
 import logging
 import os
 import pickle
+import platform
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -311,9 +312,32 @@ def run_bilstm_trial(
             holdout tidak disentuh sampai model terbaik dipilih.
         verbose: nilai ``verbose`` untuk ``model.fit``.
     """
+    from app.experiment.gpu import detect_gpu_count
     from app.repro import apply_reproducibility_lock, seed_all
 
-    apply_reproducibility_lock(config.seed, deterministic=config.deterministic)
+    # Deterministic ops + all-reduce multi-GPU (terutama Windows /
+    # ReductionToOneDevice) memakai unsorted segment reduction yang tidak
+    # punya implementasi deterministik di GPU. Untuk multi-GPU, matikan
+    # deterministic ops dan catat di laporan.
+    detected_gpus = detect_gpu_count()
+    deterministic_used = config.deterministic
+    if (
+        deterministic_used
+        and config.multi_gpu
+        and detected_gpus > 1
+        and (
+            platform.system() == "Windows"
+            or config.cross_device_ops in ("auto", "reduction_to_one")
+        )
+    ):
+        logger.warning(
+            "Deterministic ops tidak didukung untuk all-reduce multi-GPU di "
+            "platform ini. Multi-GPU akan berjalan dengan deterministic=False; "
+            "gunakan single GPU jika reproducibility penuh diperlukan."
+        )
+        deterministic_used = False
+
+    apply_reproducibility_lock(config.seed, deterministic=deterministic_used)
 
     try:
         import tensorflow as tf
@@ -345,7 +369,7 @@ def run_bilstm_trial(
     # masih bisa diatur.
     gpu_info = configure_gpu(config.memory_growth)
     tf.keras.backend.clear_session()
-    seed_all(config.seed, deterministic=config.deterministic)
+    seed_all(config.seed, deterministic=deterministic_used)
     policy = config.mixed_precision
     if gpu_info["gpu_count"] == 0 and policy != "float32":
         logger.warning(
@@ -555,6 +579,8 @@ def run_bilstm_trial(
                 "mixed_precision": policy,
                 "replicas": replicas,
                 "cross_device_ops": config.cross_device_ops,
+                "deterministic_requested": config.deterministic,
+                "deterministic_used": deterministic_used,
                 "batch_per_replica": config.batch_size,
                 "effective_batch_size": train_batch_size,
                 "steps_per_execution": fit_extra.get("steps_per_execution", 1),

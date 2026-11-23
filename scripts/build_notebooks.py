@@ -569,6 +569,10 @@ Di **Windows**, `cross_device_ops="auto"` otomatis memakai
 `ReductionToOneDevice` karena TensorFlow Windows tidak punya kernel NCCL.
 Jika muncul error `NcclAllReduce`, set
 `config.cross_device_ops = "reduction_to_one"` atau `config.multi_gpu = False`.
+
+Untuk multi-GPU, pipeline otomatis memakai `deterministic=False` karena
+all-reduce-nya tidak deterministik. Jika butuh reproducibility penuh,
+pakai satu GPU (`config.multi_gpu = False`).
 """
     ),
     md(

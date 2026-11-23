@@ -41,6 +41,10 @@ Catatan:
 - Metric training memakai implementasi custom (`reduce_sum`) agar tidak
   memicu error `UnsortedSegmentSum` di GPU.
 - ROC-AUC/AP dihitung setelah training dengan scikit-learn.
+- Untuk multi-GPU di Windows/`ReductionToOneDevice`, pipeline otomatis
+  memakai `deterministic=False` karena all-reduce-nya memakai operasi yang
+  tidak punya implementasi deterministik di GPU. Jika reproducibility penuh
+  diperlukan, pakai **single GPU** dengan `deterministic=True`.
 - FP16/TF32 dapat mengubah angka metrik sedikit dibanding FP32. Untuk paper,
   tetapkan satu presisi dan laporkan; jangan mencampur hasil FP32 dan FP16
   dalam satu tabel perbandingan.
@@ -199,6 +203,7 @@ Jika OOM:
 | `Deterministic GPU implementation ... not available` | Op/metric non-deterministik | Versi ini sudah memakai metric custom; jika tetap muncul set `BiLSTMConfig(deterministic=False)` |
 | `CUDA out of memory` | Batch/seq terlalu besar | Turunkan batch/`max_len`, aktifkan gradient checkpointing/auto batch |
 | `No OpKernel was registered ... NcclAllReduce` | TensorFlow Windows tidak punya NCCL | Gunakan `cross_device_ops="reduction_to_one"` (default `auto` di Windows) atau `multi_gpu=False` |
+| `Deterministic GPU ... unsorted segment reduction` saat multi-GPU | All-reduce multi-GPU tidak deterministik | Pipeline otomatis `deterministic=False`; restart kernel. Untuk reproducibility penuh, `multi_gpu=False` |
 | Multi-GPU tidak lebih cepat | Batch per GPU terlalu kecil / PCIe | Naikkan batch per GPU, kurangi overhead data loader |
 | DDP gagal di Windows | NCCL tidak tersedia | Gunakan backend `gloo` |
 | GPU hanya terpakai 1 | `CUDA_VISIBLE_DEVICES` salah | Cek dengan `nvidia-smi` dan `torch.cuda.device_count()` |

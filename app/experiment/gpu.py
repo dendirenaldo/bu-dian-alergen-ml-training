@@ -8,9 +8,51 @@ from __future__ import annotations
 
 import os
 import platform
+import shutil
+import subprocess
 from typing import Any
 
 _GPU_CONFIGURED = False
+
+
+def detect_gpu_count() -> int:
+    """Hitung GPU tanpa mengimpor TensorFlow (untuk keputusan sebelum import).
+
+    Urutan: ``CUDA_VISIBLE_DEVICES`` -> ``torch.cuda.device_count()`` ->
+    ``nvidia-smi -L``.
+    """
+    visible = os.environ.get("CUDA_VISIBLE_DEVICES")
+    if visible is not None:
+        entries = [item.strip() for item in visible.split(",") if item.strip()]
+        if entries and entries != ["-1"]:
+            return len(entries)
+        if entries == ["-1"]:
+            return 0
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            return int(torch.cuda.device_count())
+    except Exception:
+        pass
+    candidates = [
+        shutil.which("nvidia-smi"),
+        shutil.which("nvidia-smi.exe"),
+        r"C:\Program Files\NVIDIA Corporation\NVSMI\nvidia-smi.exe",
+    ]
+    for executable in candidates:
+        if not executable:
+            continue
+        try:
+            out = subprocess.check_output(
+                [executable, "-L"], stderr=subprocess.DEVNULL, timeout=5
+            ).decode()
+            return sum(
+                1 for line in out.splitlines() if line.strip().startswith("GPU ")
+            )
+        except Exception:
+            continue
+    return 0
 _STRATEGY = None
 _STRATEGY_KEY: tuple[bool, int, str] | None = None
 
