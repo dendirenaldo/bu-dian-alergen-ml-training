@@ -32,7 +32,7 @@ Default `BiLSTMConfig`:
 | `use_tf_data` | `True` | Dataset `tf.data` + `prefetch(AUTOTUNE)` |
 | `prefetch` | `True` | Overlap CPU/GPU |
 | `memory_growth` | `True` | TF tidak mengambil seluruh 12 GB VRAM di awal |
-| `steps_per_execution` | `10` | Mengurangi overhead Python per step |
+| `steps_per_execution` | `1` | Opsional; set `10` jika versi Keras mendukung argumen ini di `model.fit()` |
 | `deterministic` | `True` | Deterministic ops; jika driver menolak, set `False` |
 
 Catatan:
@@ -190,7 +190,7 @@ Jika OOM:
 | DDP gagal di Windows | NCCL tidak tersedia | Gunakan backend `gloo` |
 | GPU hanya terpakai 1 | `CUDA_VISIBLE_DEVICES` salah | Cek dengan `nvidia-smi` dan `torch.cuda.device_count()` |
 | Memory growth error | GPU sudah diinisialisasi | Restart kernel/proses, panggil `configure_gpu` paling awal |
-| Error pada `steps_per_execution` | Versi Keras/driver tidak mendukung | Set `BiLSTMConfig(steps_per_execution=1)` |
+| Error pada `steps_per_execution` | Versi Keras tidak punya argumen itu | Biarkan `1`; pipeline otomatis mengabaikan jika tidak didukung |
 
 ---
 

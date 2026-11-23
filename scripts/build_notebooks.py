@@ -616,8 +616,8 @@ if QUICK_RUN:
     config.epochs = 5
     config.early_stopping_patience = 2
 
-# RTX 3080 Ti: mixed_float16 + tf.data + steps_per_execution sudah default.
-# Kurangi steps_per_execution ke 1 jika ingin debugging per-step.
+# RTX 3080 Ti: mixed_float16 + tf.data sudah default.
+# steps_per_execution default 1; set 10 hanya jika versi Keras mendukung.
 print("mixed_precision:", config.mixed_precision)
 print("multi_gpu:", config.multi_gpu, "| auto_scale_batch_size:", config.auto_scale_batch_size)
 

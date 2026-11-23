@@ -485,7 +485,8 @@ Target hardware: **RTX 3080 Ti** (Ampere, compute capability 8.6,
 - `BiLSTMConfig`:
   - `mixed_precision="mixed_float16"`, `multi_gpu=True`,
     `auto_scale_batch_size=True`, `use_tf_data=True`, `prefetch=True`,
-    `memory_growth=True`, `steps_per_execution=10`.
+    `memory_growth=True`, `steps_per_execution=1` (opsional; dinaikkan hanya
+  jika versi Keras mendukung).
 - `run_bilstm_trial()`:
   - Build/compile model di dalam `strategy.scope()`.
   - `tf.data` + shuffle + prefetch; class weight sebagai sample weight.

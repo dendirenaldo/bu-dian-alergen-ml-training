@@ -152,7 +152,7 @@ class BiLSTMConfig:
     use_tf_data: bool = True
     prefetch: bool = True
     memory_growth: bool = True
-    steps_per_execution: int = 10
+    steps_per_execution: int = 1
 
     # --- Reproducibility ---
     seed: int = 42

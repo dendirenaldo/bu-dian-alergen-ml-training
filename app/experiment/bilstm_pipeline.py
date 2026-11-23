@@ -453,10 +453,24 @@ def run_bilstm_trial(
             )
         )
 
-    fit_extra = (
-        {"steps_per_execution": config.steps_per_execution}
-        if config.steps_per_execution > 1 else {}
-    )
+    # Tidak semua versi Keras mendukung steps_per_execution di model.fit().
+    # Hanya kirim jika tersedia; jika tidak, jalankan tanpa argumen tersebut.
+    fit_extra: dict[str, int] = {}
+    if config.steps_per_execution > 1:
+        try:
+            import inspect
+
+            fit_parameters = inspect.signature(model.fit).parameters
+            if "steps_per_execution" in fit_parameters:
+                fit_extra["steps_per_execution"] = config.steps_per_execution
+            else:
+                logger.warning(
+                    "steps_per_execution tidak didukung versi Keras ini; diabaikan."
+                )
+        except Exception:
+            logger.warning(
+                "Tidak bisa memeriksa signature model.fit; steps_per_execution diabaikan."
+            )
     started = time.time()
     if config.use_tf_data:
         train_ds = _dataset(
@@ -541,7 +555,7 @@ def run_bilstm_trial(
                 "replicas": replicas,
                 "batch_per_replica": config.batch_size,
                 "effective_batch_size": train_batch_size,
-                "steps_per_execution": config.steps_per_execution,
+                "steps_per_execution": fit_extra.get("steps_per_execution", 1),
                 "use_tf_data": config.use_tf_data,
             },
             "config": config.to_dict(),

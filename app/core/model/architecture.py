@@ -44,15 +44,12 @@ class _BinaryConfusionMetric(tf.keras.metrics.Metric):
     def __init__(self, threshold: float = 0.5, name: str = "binary_metric", **kwargs):
         super().__init__(name=name, **kwargs)
         self.threshold = float(threshold)
-        self.tp = self.add_weight(
-            name="tp", initializer="zeros", aggregation=tf.VariableAggregation.SUM
-        )
-        self.fp = self.add_weight(
-            name="fp", initializer="zeros", aggregation=tf.VariableAggregation.SUM
-        )
-        self.fn = self.add_weight(
-            name="fn", initializer="zeros", aggregation=tf.VariableAggregation.SUM
-        )
+        # Keras 3 Metric.add_variable memakai aggregation="sum" dan
+        # synchronization="on_read" secara default, sehingga aman untuk
+        # MirroredStrategy tanpa argumen tambahan.
+        self.tp = self.add_weight(name="tp", initializer="zeros")
+        self.fp = self.add_weight(name="fp", initializer="zeros")
+        self.fn = self.add_weight(name="fn", initializer="zeros")
 
     def update_state(self, y_true, y_pred, sample_weight=None):
         y_true = tf.cast(tf.reshape(y_true, (-1,)), tf.float32)
