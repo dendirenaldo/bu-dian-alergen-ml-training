@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install lightweight test deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install numpy pandas scikit-learn pytest click python-dotenv rapidfuzz pyflakes
+      - name: Static import check (pyflakes)
+        run: pyflakes app scripts tests
+
+      - name: Run tests (TensorFlow tests are skipped)
+        run: pytest -q
+      - name: Validate notebooks JSON and code syntax
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          for path in sorted(Path("notebooks").glob("*.ipynb")):
+              nb = json.loads(path.read_text(encoding="utf-8"))
+              for index, cell in enumerate(nb["cells"]):
+                  if cell["cell_type"] == "code":
+                      compile("".join(cell["source"]), f"{path}:{index}", "exec")
+              print("valid:", path)
+          PY
