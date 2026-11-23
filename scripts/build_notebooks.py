@@ -323,6 +323,7 @@ Waktu sangat bergantung pada CPU/GPU, panjang teks, dan batch size.
 | Training sangat lambat | CPU / max_len besar | Turunkan `epochs`, `max_len`, atau pakai GPU |
 | `CUDA out of memory` | Batch terlalu besar | Turunkan `batch_size` atau aktifkan `gradient_accumulation_steps` |
 | Hasil berbeda setiap run | Hash randomization / seed | Set `PYTHONHASHSEED=42` sebelum Python, pakai seed yang sama |
+| `Deterministic GPU implementation ... not available` | Metric Keras/ops tertentu tidak deterministik di GPU | Versi ini sudah memakai metric custom; jika masih muncul, set `config.deterministic = False` |
 | `FileNotFoundError` CSV | Path salah | Set `DataConfig.csv_input` ke path absolut |
 | Model BERT tidak download | Tidak ada internet | Unduh di login node, set `HF_HUB_OFFLINE=1` |
 """

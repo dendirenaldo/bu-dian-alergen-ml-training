@@ -142,11 +142,12 @@ class BiLSTMConfig:
     # --- Urutan data & pemilihan model ---
     shuffle: bool = True
     preshuffle: bool = False
-    monitor: Literal["val_loss", "val_f1", "val_roc_auc", "val_average_precision"] = "val_loss"
+    monitor: Literal["val_loss", "val_f1"] = "val_loss"
     monitor_mode: Literal["min", "max"] = "min"
 
     # --- Reproducibility ---
     seed: int = 42
+    deterministic: bool = True
 
     def __post_init__(self) -> None:
         _require(self.vocab_size > 0, "vocab_size harus > 0.")
@@ -183,11 +184,14 @@ class BiLSTMConfig:
         _require(self.min_lr > 0, "min_lr harus > 0.")
         _check_fraction("label_smoothing", self.label_smoothing)
         _require(
-            self.monitor in ("val_loss", "val_f1", "val_roc_auc", "val_average_precision"),
-            "monitor harus salah satu: val_loss, val_f1, val_roc_auc, val_average_precision.",
+            self.monitor in ("val_loss", "val_f1"),
+            "monitor harus 'val_loss' atau 'val_f1'. ROC-AUC/AP dihitung "
+            "setelah training dengan scikit-learn (bukan metric Keras) agar "
+            "kompatibel dengan deterministic GPU.",
         )
         _require(self.monitor_mode in ("min", "max"), "monitor_mode harus 'min' atau 'max'.")
         _require(self.seed >= 0, "seed tidak boleh negatif.")
+        _require(isinstance(self.deterministic, bool), "deterministic harus boolean.")
         if self.monitor == "val_loss":
             _require(self.monitor_mode == "min", "monitor val_loss harus memakai mode 'min'.")
         else:

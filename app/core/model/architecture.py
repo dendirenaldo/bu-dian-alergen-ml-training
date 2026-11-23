@@ -32,10 +32,16 @@ from tensorflow.keras.models import Sequential
 logger = logging.getLogger(__name__)
 
 
-class BinaryF1(tf.keras.metrics.Metric):
-    """F1 biner pada threshold 0,5 agar bisa dipakai EarlyStopping/HPO."""
+class _BinaryConfusionMetric(tf.keras.metrics.Metric):
+    """Base metric biner yang deterministik di GPU.
 
-    def __init__(self, threshold: float = 0.5, name: str = "f1", **kwargs):
+    Metric bawaan ``tf.keras.metrics.Precision/Recall`` memakai
+    ``unsorted_segment_sum`` yang tidak punya implementasi deterministik di
+    GPU. Akibatnya training gagal saat ``TF_DETERMINISTIC_OPS=1``. Metric ini
+    hanya memakai ``reduce_sum`` sehingga aman untuk mode deterministik.
+    """
+
+    def __init__(self, threshold: float = 0.5, name: str = "binary_metric", **kwargs):
         super().__init__(name=name, **kwargs)
         self.threshold = float(threshold)
         self.tp = self.add_weight(name="tp", initializer="zeros")
@@ -45,20 +51,44 @@ class BinaryF1(tf.keras.metrics.Metric):
     def update_state(self, y_true, y_pred, sample_weight=None):
         y_true = tf.cast(tf.reshape(y_true, (-1,)), tf.float32)
         y_pred = tf.cast(tf.reshape(y_pred, (-1,)) >= self.threshold, tf.float32)
-        tp = tf.reduce_sum(y_true * y_pred)
-        fp = tf.reduce_sum((1.0 - y_true) * y_pred)
-        fn = tf.reduce_sum(y_true * (1.0 - y_pred))
-        self.tp.assign_add(tp)
-        self.fp.assign_add(fp)
-        self.fn.assign_add(fn)
-
-    def result(self):
-        return 2.0 * self.tp / (2.0 * self.tp + self.fp + self.fn + 1e-8)
+        self.tp.assign_add(tf.reduce_sum(y_true * y_pred))
+        self.fp.assign_add(tf.reduce_sum((1.0 - y_true) * y_pred))
+        self.fn.assign_add(tf.reduce_sum(y_true * (1.0 - y_pred)))
 
     def reset_state(self):
         self.tp.assign(0.0)
         self.fp.assign(0.0)
         self.fn.assign(0.0)
+
+
+class BinaryPrecision(_BinaryConfusionMetric):
+    """Precision biner tanpa operasi segment-sum."""
+
+    def __init__(self, threshold: float = 0.5, name: str = "precision", **kwargs):
+        super().__init__(threshold=threshold, name=name, **kwargs)
+
+    def result(self):
+        return self.tp / (self.tp + self.fp + 1e-8)
+
+
+class BinaryRecall(_BinaryConfusionMetric):
+    """Recall biner tanpa operasi segment-sum."""
+
+    def __init__(self, threshold: float = 0.5, name: str = "recall", **kwargs):
+        super().__init__(threshold=threshold, name=name, **kwargs)
+
+    def result(self):
+        return self.tp / (self.tp + self.fn + 1e-8)
+
+
+class BinaryF1(_BinaryConfusionMetric):
+    """F1 biner pada threshold 0,5 untuk EarlyStopping/HPO."""
+
+    def __init__(self, threshold: float = 0.5, name: str = "f1", **kwargs):
+        super().__init__(threshold=threshold, name=name, **kwargs)
+
+    def result(self):
+        return 2.0 * self.tp / (2.0 * self.tp + self.fp + self.fn + 1e-8)
 
 
 def _build_optimizer(
@@ -206,13 +236,15 @@ def build_model(
     model.compile(
         optimizer=_build_optimizer(optimizer, lr, weight_decay, gradient_clip_norm),
         loss=loss,
+        # CATATAN GPU: jangan memakai tf.keras.metrics.AUC/Precision/Recall
+        # di sini. Metric bawaan memakai unsorted_segment_sum yang tidak
+        # deterministik di GPU dan membuat training gagal saat
+        # TF_DETERMINISTIC_OPS=1. ROC-AUC/AP tetap dihitung setelah training
+        # dengan scikit-learn pada probabilitas validasi/holdout.
         metrics=[
             "accuracy",
-            tf.keras.metrics.Precision(name="precision"),
-            tf.keras.metrics.Recall(name="recall"),
-            tf.keras.metrics.AUC(name="auc"),
-            tf.keras.metrics.AUC(name="roc_auc"),
-            tf.keras.metrics.AUC(curve="PR", name="average_precision"),
+            BinaryPrecision(name="precision"),
+            BinaryRecall(name="recall"),
             BinaryF1(name="f1"),
         ],
     )

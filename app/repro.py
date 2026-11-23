@@ -11,7 +11,7 @@ import os
 import random
 
 
-def apply_reproducibility_lock(seed: int = 42) -> dict:
+def apply_reproducibility_lock(seed: int = 42, deterministic: bool = True) -> dict:
     """Set env determinism (seperti Notebook V5 Cell 1).
 
     Mengikuti notebook: set sebelum import TF.
@@ -23,18 +23,26 @@ def apply_reproducibility_lock(seed: int = 42) -> dict:
     """
     env = {
         "PYTHONHASHSEED": str(seed),
-        "TF_DETERMINISTIC_OPS": "1",
-        "TF_CUDNN_DETERMINISTIC": "1",
-        "CUBLAS_WORKSPACE_CONFIG": ":4096:8",
         "TF_ENABLE_ONEDNN_OPTS": "0",
     }
+    if deterministic:
+        env.update({
+            "TF_DETERMINISTIC_OPS": "1",
+            "TF_CUDNN_DETERMINISTIC": "1",
+            "CUBLAS_WORKSPACE_CONFIG": ":4096:8",
+        })
+    else:
+        # Escape hatch untuk GPU/driver yang tidak mendukung op deterministik.
+        for key in ("TF_DETERMINISTIC_OPS", "TF_CUDNN_DETERMINISTIC",
+                    "CUBLAS_WORKSPACE_CONFIG"):
+            os.environ.pop(key, None)
     os.environ["PYTHONHASHSEED"] = str(seed)
     for k, v in env.items():
         os.environ.setdefault(k, v)
     return {k: os.environ.get(k) for k in env}
 
 
-def seed_all(seed: int = 42) -> None:
+def seed_all(seed: int = 42, deterministic: bool = True) -> None:
     """Seed ulang semua RNG user-space (dipanggil ulang tiap tahap, ala notebook).
 
     - ``random`` + ``numpy`` selalu di-seed.
@@ -56,10 +64,11 @@ def seed_all(seed: int = 42) -> None:
             tf.keras.utils.set_random_seed(seed)
         except Exception:
             pass
-        try:
-            tf.config.experimental.enable_op_determinism()
-        except Exception:
-            pass
+        if deterministic:
+            try:
+                tf.config.experimental.enable_op_determinism()
+            except Exception:
+                pass
     except ImportError:
         pass
 

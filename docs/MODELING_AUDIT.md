@@ -397,3 +397,58 @@ model.
 - `old/` adalah kode legacy dan tidak dipakai pipeline baru.
 - Training TensorFlow/IndoBERT tetap perlu dijalankan di environment Python
   3.12 + GPU/HPC untuk validasi kualitas model sebenarnya.
+
+---
+
+## 12. Audit GPU Determinism (Error `UnsortedSegmentSum`)
+
+Saat training BiLSTM di GPU, muncul error:
+
+```text
+UnimplementedError: Deterministic GPU implementation of unsorted segment
+reduction op not available.
+Node: 'UnsortedSegmentSum_5'
+```
+
+### 12.1 Akar masalah
+
+- `app/repro.py` mengaktifkan `TF_DETERMINISTIC_OPS=1` dan
+  `tf.config.experimental.enable_op_determinism()`.
+- Metric bawaan Keras (`AUC`, `Precision`, `Recall`) memakai
+  `unsorted_segment_sum` di `metrics_utils.update_confusion_matrix_variables`.
+- Operasi tersebut belum punya implementasi deterministik di GPU, sehingga
+  training berhenti saat metric dihitung — bukan karena model/arsitektur.
+
+### 12.2 Perbaikan
+
+1. `app/core/model/architecture.py` sekarang memakai metric custom:
+   - `BinaryPrecision`
+   - `BinaryRecall`
+   - `BinaryF1`
+   Semuanya hanya memakai `reduce_sum` dan `assign_add`, bukan segment-sum.
+2. `tf.keras.metrics.AUC` dihapus dari `model.compile`. ROC-AUC dan Average
+   Precision tetap dihitung **setelah training** dari probabilitas
+   validasi/holdout memakai scikit-learn, jadi angka laporan tidak berubah.
+3. `BiLSTMConfig.monitor` dibatasi ke `val_loss` dan `val_f1`. ROC-AUC/AP
+   tidak lagi dipakai sebagai monitor per-epoch.
+4. Ditambahkan escape hatch `BiLSTMConfig(deterministic=False)` dan
+   `apply_reproducibility_lock(..., deterministic=False)` untuk GPU/driver
+   yang tetap menolak op deterministik. Jika dipakai, catat di laporan bahwa
+   reproducibility GPU dibatasi oleh driver.
+
+### 12.3 Dampak ke artefak
+
+- `training_history_*.csv` tidak lagi memiliki kolom `auc`/`average_precision`.
+  Kolom `accuracy`, `precision`, `recall`, `f1`, dan `val_*` tetap ada.
+- `evaluation_table_v5.csv`, `bootstrap_ci_v5.csv`, dan kurva ROC/PR tetap
+  memakai ROC-AUC/AP dari scikit-learn, dihitung dari `probs_val.csv` dan
+  `probs_holdout.csv`.
+
+### 12.4 Validasi
+
+- `pyflakes` seluruh Python: PASS.
+- `pytest`: 47 passed, 1 skipped.
+- Syntax 7 notebook: PASS.
+- Eksekusi GPU sebenarnya belum bisa dilakukan di environment audit; namun
+  seluruh pemanggilan `tf.keras.metrics.AUC/Precision/Recall` sudah dihapus
+  dari jalur training.

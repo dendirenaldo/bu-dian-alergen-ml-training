@@ -78,8 +78,10 @@ nilai agar waktu training wajar. Preset `smoke` hanya untuk uji pipeline.
 
 ### 2.4 Pemilihan model
 
-Default: `val_f1` (maximize). Pilihan lain: `val_loss` (minimize),
-`val_roc_auc` (maximize), `val_average_precision` (maximize).
+Default: `val_f1` (maximize). Pilihan lain: `val_loss` (minimize).
+ROC-AUC dan average precision **tidak** dipakai sebagai monitor training
+karena metric Keras-nya memakai operasi GPU non-deterministik; keduanya
+dihitung setelah training dengan scikit-learn dari probabilitas validasi.
 
 ---
 
@@ -278,3 +280,10 @@ Versi Inggris singkat:
   determinisme. Regenerate sekali dengan `scripts/rebuild_split.py`, lalu
   latih ulang model BERT agar hash data dan hasil konsisten.
 - Word2Vec memakai `workers=1` agar deterministik.
+- Metric training BiLSTM memakai implementasi custom (`reduce_sum`) karena
+  `tf.keras.metrics.AUC/Precision/Recall` memakai `unsorted_segment_sum` yang
+  tidak deterministik di GPU. ROC-AUC/AP dihitung setelah training dengan
+  scikit-learn.
+- Jika GPU/driver tetap menolak op deterministik, set
+  `BiLSTMConfig(deterministic=False)` untuk run tersebut dan catat di laporan
+  bahwa reproducibility GPU dibatasi oleh driver.

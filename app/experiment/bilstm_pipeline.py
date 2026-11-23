@@ -313,8 +313,8 @@ def run_bilstm_trial(
     """
     from app.repro import apply_reproducibility_lock, seed_all
 
-    apply_reproducibility_lock(config.seed)
-    seed_all(config.seed)
+    apply_reproducibility_lock(config.seed, deterministic=config.deterministic)
+    seed_all(config.seed, deterministic=config.deterministic)
 
     try:
         import tensorflow as tf
